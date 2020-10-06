@@ -1,0 +1,28 @@
+{
+  "name": "fisco-bcos-autobench",
+  "version": "1.0.0",
+  "description": "fisco-bcos-autobench is a tool that automatically implements blockchain(fisco-bcos) deployment, benchmark testing and experimental data collection.",
+  "main": "autobench.py",
+  "scripts": {
+    "test": "python autobench.py"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dfface/fisco-bcos-autobench.git"
+  },
+  "keywords": [
+    "fisco-bcos",
+    "autobench"
+  ],
+  "author": "dfface",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/dfface/fisco-bcos-autobench/issues"
+  },
+  "homepage": "https://github.com/dfface/fisco-bcos-autobench#readme",
+  "dependencies": {
+    "@hyperledger/caliper-cli": "^0.3.2",
+    "secp256k1": "^3.0.0",
+    "web3": "^0.20.7"
+  }
+}
