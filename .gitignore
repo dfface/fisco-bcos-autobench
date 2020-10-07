@@ -4,3 +4,11 @@ venv
 .idea
 caliper_history/log/
 caliper_history/report/
+smart_contracts/HelloWorld.address
+caliper.log
+data.csv
+report.html
+network/nodes/
+network/fisco-bcos.json
+network/ipconfig
+benchmark/config.yaml

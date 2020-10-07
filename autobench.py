@@ -8,6 +8,7 @@ from datetime import datetime
 import stat
 from tqdm import tqdm
 import sys
+import csv
 
 # test steps:
 # 0 hardware is ready
@@ -17,23 +18,21 @@ import sys
 
 # 1 system settings
 node_bin_path = "/Users/yuhanliu/.nvm/versions/node/v8.17.0/bin/"  # 'which npm' then you find the bin path
-username = "root"  # host's ssh login username (keep consistent with all hosts)
-password = "123456"  # host's ssh login password (keep consistent with all hosts)
 root_password = "123456"  # must be root's password, PermitRootLogin yes (keep consistent with all hosts)
 # 2 test options
 consensus_type = "pbft"  # (pbft raft rpbft)
 storage_type = "rocksdb"  # (rocksdb mysql external scalable)
 tx_num = 10000  # the total number of transactions
-tx_speed = 5000  # the max speed of sending transactions (tps)
-block_tx_num = 2000  # the max number of transactions of a block
-epoch_sealer_num = 2  # the working sealers num of each consensus epoch
+tx_speed = 1000  # the max speed of sending transactions (tps)
+block_tx_num = 1000  # the max number of transactions of a block
+epoch_sealer_num = 4  # the working sealers num of each consensus epoch
 consensus_timeout = 3  # in seconds, block consensus timeout, at least 3s
 epoch_block_num = 1000  # the number of generated blocks each epoch
 host_addr = ["192.168.177.153", "192.168.177.154"]  # the host address of each server
-node_num = 5  # the total num of nodes (sealer & follower)
-sealer_num = 5  # the total num of sealer nodes (consensusers)
+node_num = 4  # the total num of nodes (sealer & follower)
+sealer_num = 4  # the total num of sealer nodes (consensusers)
 # better not to change
-worker_num = 5  # specifies the number of worker processes to use for executing the workload (caliper)
+worker_num = 1  # specifies the number of worker processes to use for executing the workload (caliper)
 node_outgoing_bandwidth = 0  # 0 means no limit
 group_flag = 1  # the group includes all nodes
 agency_flag = "dfface"  # the agency name
@@ -197,8 +196,8 @@ def copy_nodes_to_all_host():
     :return: 1
     """
     for host in host_addr:
-        copy_result = subprocess.getoutput("sshpass -p {password} scp -r network/nodes/ {username}@{host}:/data/"
-                                           .format(password=password, username=username, host=host))
+        copy_result = subprocess.getoutput("sshpass -p {password} scp -r network/nodes/ root@{host}:/data/"
+                                           .format(password=root_password, host=host))
         logging.debug(copy_result + "copy to {} /data/nodes".format(host))
     logging.info("copy nodes to all hosts finished.")
     return 1
@@ -383,7 +382,7 @@ def test():
         r"\n\| set  \|\s*(\S*)\s*\|\s*(\S*)\s*\|\s*(\S*)\s*\|\s*(\S*)\s*\|\s*(\S*)\s*\|\s*(\S*)\s*\|\s*(\S*)\s*\|")
     get_result = pattern_get.findall(searched[0])[0]
     set_result = pattern_set.findall(searched[0])[0]
-    logging.info("get :" + str(get_result))
+    logging.info("get: " + str(get_result))
     logging.info("set: " + str(set_result))
     return test_datetime, get_result, set_result
 
@@ -438,8 +437,8 @@ def clean():
     finally:
         logging.info("./smart_contracts/HelloWorld.address cleaned.")
     for host in host_addr:
-        remove_result = subprocess.getoutput("sshpass -p {password} ssh {username}@{host} 'rm -rf /data/nodes'"
-                                             .format(password=password, username="root", host=host))
+        remove_result = subprocess.getoutput("sshpass -p {password} ssh root@{host} 'rm -rf /data/nodes'"
+                                             .format(password=root_password, host=host))
         logging.info(remove_result + "{}: /data/nodes removed.".format(host))
 
 
@@ -451,6 +450,65 @@ def caliper_history(test_datetime):
     shutil.copyfile("./report.html", "./caliper_history/report/" + test_datetime.strftime("%Y-%m-%d %H:%M:%S") + " report.html")
     shutil.copyfile("./caliper.log", "./caliper_history/log/" + test_datetime.strftime("%Y-%m-%d %H:%M:%S") + " caliper.log")
     return 1
+
+
+def add_data(test_datetime, get_result, set_result):
+    try:
+        with open("data.csv", 'r', newline='') as data_csv:
+            has_header = csv.Sniffer().has_header(data_csv.readline())
+    except FileNotFoundError:
+        has_header = False
+    finally:
+        pass
+    with open("data.csv", 'a', newline='') as data_csv:
+        fields = ["datetime", "tx_num", "tx_send_rate", "tx_type", "block_tx_num", "consensus_timeout", "consensus_type",
+                  "node_num", "sealer_num", "epoch_sealer_num", "storage_type", "epoch_block_num",  "node_bandwidth_limit",
+                  "worker_num", "max_latency", "min_latency", "avg_latency", "throughput"]
+        writer = csv.DictWriter(data_csv, fieldnames=fields)
+        if not has_header:
+            writer.writeheader()
+        get_data = {
+            "datetime": str(test_datetime),
+            "tx_num": get_result[0],
+            "tx_send_rate": get_result[2],
+            "tx_type": "get",
+            "block_tx_num": block_tx_num,
+            "consensus_timeout": consensus_timeout,
+            "consensus_type": consensus_type,
+            "node_num": node_num,
+            "sealer_num": sealer_num,
+            "epoch_sealer_num": epoch_sealer_num,
+            "storage_type": storage_type,
+            "epoch_block_num": epoch_block_num,
+            "node_bandwidth_limit": node_outgoing_bandwidth,
+            "worker_num": worker_num,
+            "max_latency": get_result[3],
+            "min_latency": get_result[4],
+            "avg_latency": get_result[5],
+            "throughput": get_result[6]
+        }
+        writer.writerow(get_data)
+        set_data = {
+            "datetime": str(test_datetime),
+            "tx_num": set_result[0],
+            "tx_send_rate": set_result[2],
+            "tx_type": "set",
+            "block_tx_num": block_tx_num,
+            "consensus_timeout": consensus_timeout,
+            "consensus_type": consensus_type,
+            "node_num": node_num,
+            "sealer_num": sealer_num,
+            "epoch_sealer_num": epoch_sealer_num,
+            "storage_type": storage_type,
+            "epoch_block_num": epoch_block_num,
+            "node_bandwidth_limit": node_outgoing_bandwidth,
+            "worker_num": worker_num,
+            "max_latency": set_result[3],
+            "min_latency": set_result[4],
+            "avg_latency": set_result[5],
+            "throughput": set_result[6]
+        }
+        writer.writerow(set_data)
 
 
 def test_once():
@@ -465,7 +523,8 @@ def test_once():
     gen_benchmark_config()
     test_datetime, get_result, set_result = test()
     caliper_history(test_datetime)
+    add_data(test_datetime, get_result, set_result)
 
 
 if __name__ == '__main__':
-    clean()
+    test_once()
