@@ -4,7 +4,7 @@ import shutil
 import logging
 import re
 import json
-import datetime
+from datetime import datetime
 import stat
 from tqdm import tqdm
 import sys
@@ -57,7 +57,7 @@ logging.basicConfig(format='%(asctime)s - %(pathname)s[line:%(lineno)d] - %(leve
 
 def check():
     """
-      check constraints.
+      check constraints before every test.
     :return: 1
     """
     assert node_num >= sealer_num
@@ -272,7 +272,7 @@ def gen_benchmark_config():
     docker_addr = ""
     for host in host_addr:
         docker_addr += "    - http://{}:2375/all\n".format(host)
-    generate_time = datetime.datetime.now()
+    generate_time = datetime.now()
     benchmark_config_string = """# benchmark config\n# author: {agency_flag}\n# time: {generate_time}\n
 ---
 test:
@@ -352,7 +352,7 @@ def test():
     """
     auto benchmark test.
     need git clone, nvm use 8 && npm install
-    :return: 1
+    :return: test_time, get_result, set_result
     """
     os.putenv("PATH", ":".join([os.getenv("PATH"), node_bin_path]))
     # benchmark command
@@ -370,7 +370,11 @@ def test():
     # catch time
     pattern_time = re.compile(r"### All test results ###\n(\S*) info")
     test_time = pattern_time.findall(output_string)[0]
-    logging.info("test time: " + test_time)
+    pattern_datetime = re.compile(r"(\d*).(\d*).(\d*)-(\d*):(\d*):(\d*)\.(\d*)")
+    test_datetime = pattern_datetime.match(test_time)
+    test_datetime = [int(test_datetime.group(i)) for i in range(1, 7)]
+    test_datetime = datetime(*test_datetime)
+    logging.info("test time: " + str(test_datetime))
     logging.info("test result: (Succ, Fail, Send Rate(TPS), Max Latency(s), Min Latency(s), Avg Latency(s), Throughput(TPS))")
     # catch operation type: get/set
     pattern_get = re.compile(
@@ -381,12 +385,12 @@ def test():
     set_result = pattern_set.findall(searched[0])[0]
     logging.info("get :" + str(get_result))
     logging.info("set: " + str(set_result))
-    return 1
+    return test_datetime, get_result, set_result
 
 
 def clean():
     """
-    clean up
+    clean up before every test.
     need root & it's passwd, sshpass, openssh-server, PermitRootLogin
     :return:
     """
@@ -439,6 +443,16 @@ def clean():
         logging.info(remove_result + "{}: /data/nodes removed.".format(host))
 
 
+def caliper_history(test_datetime):
+    """
+    only collect caliper.log & report.html once after a test.
+    :return: 1
+    """
+    shutil.copyfile("./report.html", "./caliper_history/report/" + test_datetime.strftime("%Y-%m-%d %H:%M:%S") + " report.html")
+    shutil.copyfile("./caliper.log", "./caliper_history/log/" + test_datetime.strftime("%Y-%m-%d %H:%M:%S") + " caliper.log")
+    return 1
+
+
 def test_once():
     clean()
     check()
@@ -449,8 +463,9 @@ def test_once():
     copy_nodes_to_all_host()
     gen_network_config()
     gen_benchmark_config()
-    test()
+    test_datetime, get_result, set_result = test()
+    caliper_history(test_datetime)
 
 
 if __name__ == '__main__':
-    test_once()
+    clean()
