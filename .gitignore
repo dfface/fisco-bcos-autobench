@@ -2,3 +2,5 @@ node_modules
 venv
 .DS_Store
 .idea
+caliper_history/log/
+caliper_history/report/

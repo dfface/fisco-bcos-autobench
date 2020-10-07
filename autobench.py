@@ -425,8 +425,14 @@ def clean():
     except FileNotFoundError:
         pass
     finally:
-        logging.info(",/report.html cleaned.")
+        logging.info("./report.html cleaned.")
     logging.info("project cleaned.")
+    try:
+        os.remove("./smart_contracts/HelloWorld.address")
+    except FileNotFoundError:
+        pass
+    finally:
+        logging.info("./smart_contracts/HelloWorld.address cleaned.")
     for host in host_addr:
         remove_result = subprocess.getoutput("sshpass -p {password} ssh {username}@{host} 'rm -rf /data/nodes'"
                                              .format(password=password, username="root", host=host))
