@@ -1,14 +1,29 @@
+目录
+=================
+
+* [简介](#简介)
+* [前置条件](#前置条件)
+    * [安装Caliper的主机的条件](#安装Caliper的主机的条件)
+    * [安装区块链的主机的条件](#安装区块链的主机的条件)
+        * [Docker 安装与配置](#Docker-安装与配置)
+        * [sshd 服务的安装与配置](#sshd-服务的安装与配置)
+        * [/data 文件夹的创建](data-文件夹的创建)
+* [文件结构](#文件结构)
+* [使用步骤](#使用步骤)
+    * [v1.3 版本使用步骤](#v13-版本使用步骤)
+    * [v2.0 版本使用步骤](#v20-版本使用步骤)
+
+
 ## 简介
 
-fisco-bcos-autobench 是一个可以用来一键【部署区块链、进行压力测试、收集实验数据】的工具，使用 python 编写，它减少了这些过程中的重复劳动节省了大量时间，利用简单的配置即可一键获取若干条数据，非常适合实验数据收集。
-
+fisco-bcos-autobench 是一个用来一键【部署区块链、进行压力测试、收集实验数据】的工具，使用 python 编写，它减少了过程中的重复劳动，可节省大量时间和精力，利用简单的配置即可一键获取若干条数据，不易出错，非常适合实验数据的收集。
 ## 前置条件
 
 本工具推荐使用一台主机用于测试，若干台主机用于部署区块链。也可以在测试的主机上安装区块链，如果能装得上的话。（如果没那么多主机（服务器）可用，可结合使用 VMware Workstation/Fusion 虚拟机）。
 
 ### 安装Caliper的主机的条件
 
-测试机首先也需要安装 Docker ，Docker 安装看官网教程，比较简单：https://docs.docker.com/engine/install/，此外，如果需要在此主机上安装区块链就需要同时满足《安装区块链的主机的条件》。
+测试机首先也需要安装 Docker ，Docker 安装看官网教程，比较简单：[官方安装教程](https://docs.docker.com/engine/install/)，此外，如果需要在此主机上安装区块链就需要同时满足《安装区块链的主机的条件》。
 
 首先需要按以下步骤操作：（需 nvm、npm、git ）：
 
@@ -43,7 +58,7 @@ brew tap esolitos/ipa
 brew install sshpass
 ```
 
-**！！！**到此为止，我这里已经有一台配置好的 Ubuntu 18.04 桌面系统虚拟机可用（使用 vmware ），下载后可直接用。
+！！！到此为止，我这里已经有一台配置好的 Ubuntu 18.04 桌面系统虚拟机可用（使用 vmware ），下载后可直接用。
 
 在后面 《安装区块链的主机的条件》 完全具备之后，需要先使用 `ssh`  命令连接上**所有其他主机**，以提前保存 `fingerprint`（如果在测试阶段又新增了主机，**切记**要先手动用`ssh`连接，不然会出错）：
 
@@ -116,7 +131,9 @@ sudo mkdir /data
 sudo chmod 777 /data
 ```
 
-**！！！**到此为止，我这里已经有一台配置好的 Ubuntu 18.04 Server系统虚拟机可用（使用 vmware ），下载后可直接用。切记在区块链主机准备好之后，先用测试用主机`ssh`连接这些主机（为了保存`fingerprint`）。
+！！！到此为止，我这里已经有一台配置好的 Ubuntu 18.04 Server系统虚拟机可用（使用 vmware ），下载后可直接用，[地址](https://bhpan.buaa.edu.cn:443/link/D5D02F07710917781E8B9578348379C3) 有效期限：2025-11-30 23:59。
+切记在区块链主机准备好之后，先用测试用主机`ssh`连接这些主机（为了保存`fingerprint`）。
+虚拟机可复制，但要注意复制后虚拟机的 `IP` 配置。
 
 ## 文件结构
 
@@ -142,11 +159,12 @@ sudo chmod 777 /data
 ``` txt
 .
 ├── autobench.py
+├── autobench.log  # 本工具的日志
 ├── benchmark
 │   ├── config.yaml  # 基准测试配置文件
 │   ├── get.js
 │   └── set.js
-├── caliper_history  # caliper 历史日志和报告
+├── caliper_history  # caliper 测试的历史日志和报告
 │   ├── log  # 保存了历史日志，文件夹内部文件略
 │   └── report  # 保存了历史报告，文件夹内部文件略
 ├── network
@@ -200,12 +218,14 @@ node_outgoing_bandwidth = 0  # 0 means no limit
 
 修改好参数之后，直接运行此文件即可。
 
-P.S. 区块链性能测试结果 `data.csv` 文件应该不包括本基准测试的相关数据，如 `worker_num` ，但为了详尽加上了，对收集的数据可以进行二次处理。
+P.S. 区块链性能测试结果 `data.csv` 文件应不包括本基准测试的相关数据，如 `worker_num` ，为了详尽加上了所有信息，对收集的数据建议进行二次处理。
 
 ### v2.0 版本使用步骤
 
 v1.x 版本采用面向过程的方式编程，而v2.0 采用面向对象的方式编程。
+
 在本项目根目录下新建一个文件，如`test.py`，然后创建对象，调用`test_once`方法即可：
+
 ```python
 from autobench import AutoBench
 
@@ -214,7 +234,9 @@ autobench = AutoBench("/Users/yuhanliu/.nvm/versions/node/v8.17.0/bin/",
                       node_num=5)
 autobench.test_once()
 ```
+
 输出类似：
+
 ```bash
 auto benchmark 2 host(s) 5 nodes:  24%|██▍       | 32.0/132 [00:14<02:27, 1.48s/B]
 ```
