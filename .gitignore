@@ -12,3 +12,5 @@ network/nodes/
 network/fisco-bcos.json
 network/ipconfig
 benchmark/config.yaml
+test.py
+autobench.log
