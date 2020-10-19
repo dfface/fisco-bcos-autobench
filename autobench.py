@@ -39,9 +39,9 @@ class AutoBench(object):
         :param tx_num: the total number of transactions of this test
         :param tx_speed: the max speed of sending transactions (tps) of this test
         :param block_tx_num: the max number of transactions of a block
-        :param epoch_sealer_num: the working sealers num of each consensus epoch
+        :param epoch_sealer_num: the working sealers num of each consensus epoch (rpbft own)
         :param consensus_timeout: in seconds, block consensus timeout, at least 3s
-        :param epoch_block_num: the number of generated blocks each epoch
+        :param epoch_block_num: the number of generated blocks each epoch (rpbft own)
         :param node_num: the total num of nodes (sealer & follower)
         :param sealer_num: the total num of sealer nodes (consensusers)
         :param worker_num: specifies the number of worker processes to use for executing the workload (caliper)
@@ -116,7 +116,8 @@ class AutoBench(object):
         """
         assert self.node_num >= self.sealer_num
         assert self.node_num >= len(self.host_addr)
-        assert self.sealer_num >= self.epoch_sealer_num
+        if self.contract_type == "rpbft":
+            assert self.sealer_num >= self.epoch_sealer_num
         assert self.consensus_type in ["pbft", "raft", "rpbft"]
         assert self.storage_type in ["rocksdb", "mysql", "external", "scalable"]
         assert self.tx_num > 0

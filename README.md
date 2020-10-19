@@ -4,6 +4,9 @@
 * [简介](#简介)
 * [前置条件](#前置条件)
     * [安装Caliper的主机的条件](#安装Caliper的主机的条件)
+        * [node & git clone & npm install](#node-&-git-clone-&-npm-install)
+        * [pip install](#pip-install)
+        * [sshpass](#sshpass)
     * [安装区块链的主机的条件](#安装区块链的主机的条件)
         * [Docker 安装与配置](#Docker-安装与配置)
         * [sshd 服务的安装与配置](#sshd-服务的安装与配置)
@@ -25,6 +28,8 @@ fisco-bcos-autobench 是一个用来一键【部署区块链、进行压力测�
 
 测试机首先也需要安装 Docker ，Docker 安装看官网教程，比较简单：[官方安装教程](https://docs.docker.com/engine/install/)，此外，如果需要在此主机上安装区块链就需要同时满足《安装区块链的主机的条件》。
 
+#### node & git clone & npm install
+
 首先需要按以下步骤操作：（需 nvm、npm、git ）：
 
 ``` bash
@@ -35,18 +40,20 @@ source ~/.$(basename $SHELL)rc
 nvm install 8
 nvm use 8
 node --version # 确认为 8，无论执行什么命令先检查 node 版本
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.36.0/install.sh | bash
 # 克隆本仓库
 git clone https://github.com/dfface/fisco-bcos-autobench.git
 # 安装 node 依赖
 npm install
 ```
+#### pip install
 
 还需要安装python相关依赖（依赖在 requirements.txt 中，python 建议版本 >= 3.7）：
 
 ``` bash
 pip install -r requirements.txt
 ```
+
+#### sshpass
 
 还需要安装系统工具 `sshpass` ，它因系统而异，推荐使用 Linux、macOS（macOS只能作为测试机，不能安装区块链），可参考 [installing SSHPASS](https://gist.github.com/arunoda/7790979)。
 
@@ -224,6 +231,8 @@ P.S. 区块链性能测试结果 `data.csv` 文件应不包括本基准测试的
 
 v1.x 版本采用面向过程的方式编程，而v2.0 采用面向对象的方式编程。
 
+#### 使用样例
+
 在本项目根目录下新建一个文件，如`test.py`，然后创建对象，调用`test_once`方法即可：
 
 ```python
@@ -241,3 +250,34 @@ autobench.test_once()
 auto benchmark 2 host(s) 5 nodes:  24%|██▍       | 32.0/132 [00:14<02:27, 1.48s/B]
 ```
 
+#### 默认值
+
+| 参数 | 类型 | 默认值 |
+| :---: | :---: | :---: |
+|node_bin_path|str| 无，必须添加，可使用 `which npm` 命令截取，如 "/Users/yuhanliu/.nvm/versions/node/v8.17.0/bin/"|
+|host_addr|list| 无，必须添加，可查看要部署区块链的主机的 IP|
+|root_password| str |（方便起见，部署区块链的所有主机应具有相同的root密码）'123456'|
+|consensus_type| str |（共识类型，可选 pbft、raft、rpbft）'pbft'|
+|storage_type| str |（存储类型）'rocksdb'|
+|tx_num| int |（测试事务总量）10000|
+|tx_speed| int |（测试事务发送速率）1000|
+|block_tx_num| int |（区块打包交易数）1000|
+|epoch_sealer_num| int |（仅对 rpbft 有效）4|
+|consensus_timeout| int |（共识超时时间，最低3s）3|
+|epoch_block_num| int |（仅对 rpbft 有效）1000|
+|node_num| int |（节点总数）4|
+|sealer_num| int |（共识节点数）4|
+|worker_num| int |（测试主机工作进程数）1|
+|node_outgoing_bandwidth| int |（节点带宽限制，0表示不限制，1表示限制1M/s）0|
+|group_flag| int |1|
+|agency_flag| str |'dfface'|
+|network_config_file_path| str |'./network/fisco-bcos.json'|
+|benchmark_config_file_path| str |'./benchmark/config.yaml'|
+|ipconfig_file_path| str |'./network/ipconfig'|
+|p2p_start_port| int |30300|
+|channel_start_port| int |20200|
+|jsonrpc_start_port| int |8545|
+|contract_type| str |'solidity'|
+|state_type| str |'storage'|
+|contract_path| str |'./smart_contracts/HelloWorld.sol'|
+|log_level| enum |logging.ERROR|
