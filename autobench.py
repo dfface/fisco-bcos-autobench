@@ -360,40 +360,37 @@ monitor:
         self.logger.info("benchmark config file generated.")
 
     @classmethod
-    def run_task(cls, cmd: str, desc: str, total: int) -> str:
+    def run_task(cls, cmd: str, desc: str, total: int) -> None:
         """
         pack command with tqdm progress bar.
         :param cmd: command
         :param desc: description
         :param total: total number of output Bytes
-        :return: command output
+        :return: None
         """
         try:
             with tqdm(unit='B', unit_scale=True, miniters=1, desc=desc, total=total) as t:
                 process = subprocess.Popen(cmd, shell=True, bufsize=1, universal_newlines=True,
                                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 # print subprocess output line-by-line as soon as its stdout buffer is flushed in Python 3:
-                output = ""
                 for line in process.stdout:
                     t.update()
                     # forces stdout to "flush" the buffer
                     sys.stdout.flush()
-                    output += line
                 process.stdout.close()
                 return_code = process.wait()
                 if return_code != 0:
                     raise subprocess.CalledProcessError(return_code, cmd)
-                return output
         except subprocess.CalledProcessError as e:
             sys.stderr.write(
                 "common::run_command() : [ERROR]: output = %s, error code = %s\n"
                 % (e.output, e.returncode))
 
-    def __test(self) -> tuple:
+    def __test(self) -> None:
         """
         9. auto benchmark test.
         need git clone, nvm use 8 && npm install
-        :return: test_time, get_result, set_result
+        :return: None
         """
         os.putenv("PATH", ":".join([os.getenv("PATH"), self.node_bin_path]))
         # benchmark command
@@ -402,35 +399,57 @@ monitor:
         benchmark_config = "--caliper-benchconfig {}".format(self.benchmark_config_file_path)
         benchmark_network = "--caliper-networkconfig {}".format(self.network_config_file_path)
         self.logger.info("auto benchmark started.")
-        output_string = AutoBench.run_task(' '.join([benchmark_command, benchmark_workspace,
-                                                     benchmark_config, benchmark_network]),
-                                           "auto benchmark {} host(s) {} nodes".format(len(self.host_addr),
-                                                                                       self.node_num),
-                                           80 + self.worker_num * 28 + self.node_num * 6)
-        self.logger.debug(output_string)
-        # catch all test result
-        pattern_results = re.compile(r"### All test results ###([\s\S]*)Generated report with path", re.M | re.I | re.S)
-        searched = pattern_results.findall(output_string)
-        # catch time
-        pattern_time = re.compile(r"### All test results ###\n(\S*) info")
-        test_time = pattern_time.findall(output_string)[0]
-        pattern_datetime = re.compile(r"(\d*).(\d*).(\d*)-(\d*):(\d*):(\d*)\.(\d*)")
-        test_datetime = pattern_datetime.match(test_time)
-        test_datetime = [int(test_datetime.group(i)) for i in range(1, 7)]
-        test_datetime = datetime(*test_datetime)
-        self.logger.info("test time: " + str(test_datetime))
-        self.logger.info("test result: (Succ, Fail, Send Rate(TPS), Max Latency(s), Min Latency(s), "
-                         "Avg Latency(s), Throughput(TPS))")
-        # catch operation type: get/set
+        AutoBench.run_task(' '.join([benchmark_command, benchmark_workspace, benchmark_config, benchmark_network]),
+                           "auto benchmark {} host(s) {} nodes".format(len(self.host_addr), self.node_num),
+                           80 + self.worker_num * 28 + self.node_num * 6)
+
+    def __gen_results(self) -> tuple:
+        """
+        9.1 generate results from caliper log file.
+        :return: test_time, get_result, set_result
+        """
+        # check if caliper log file is valid
+        caliper_modify_time = datetime.fromtimestamp(os.path.getmtime('./caliper.log'))
+        benchmark_file_time = datetime.fromtimestamp(os.path.getmtime(self.benchmark_config_file_path))
+        if caliper_modify_time < benchmark_file_time:
+            raise Exception("Please check this benchmark and caliper log now.[node_num: {}, host_num: {}, cons_typ: {}]"
+                            .format(self.node_num, len(self.host_addr), self.consensus_type))
+        # generate results
         pattern_get = re.compile(
-            r"\n\| get\s*\|\s*(\S*)\s*\|\s*(\S*)\s*\|\s*(\S*)\s*\|\s*(\S*)\s*\|\s*(\S*)\s*\|\s*(\S*)\s*\|\s*(\S*)\s*\|")
+            r"\| get\s*\|\s*(\S*)\s*\|\s*(\S*)\s*\|\s*(\S*)\s*\|\s*(\S*)\s*\|\s*(\S*)\s*\|\s*(\S*)\s*\|\s*(\S*)\s*\|",
+            re.I | re.S)
         pattern_set = re.compile(
-            r"\n\| set\s*\|\s*(\S*)\s*\|\s*(\S*)\s*\|\s*(\S*)\s*\|\s*(\S*)\s*\|\s*(\S*)\s*\|\s*(\S*)\s*\|\s*(\S*)\s*\|")
-        get_result = pattern_get.findall(searched[0])[0]
-        set_result = pattern_set.findall(searched[0])[0]
-        self.logger.info("get: " + str(get_result))
-        self.logger.info("set: " + str(set_result))
-        return test_datetime, get_result, set_result
+            r"\| set\s*\|\s*(\S*)\s*\|\s*(\S*)\s*\|\s*(\S*)\s*\|\s*(\S*)\s*\|\s*(\S*)\s*\|\s*(\S*)\s*\|\s*(\S*)\s*\|",
+            re.I | re.S)
+        pattern_datetime = re.compile(r"(\d*).(\d*).(\d*)-(\d*):(\d*):(\d*)\.(\d*)\[32m info \[39m \[caliper] \["
+                                      r"report-builder] 	### All test results ###", re.I | re.S)
+        set_result_final = ""
+        get_result_final = ""
+        datetime_result_final = ""
+        try:
+            with open('caliper.log', 'r') as caliper:
+                line = caliper.readline()
+                while line:
+                    set_result = pattern_set.match(line)
+                    get_result = pattern_get.match(line)
+                    datetime_result = pattern_datetime.match(line)
+                    if get_result is not None:
+                        get_result_final = get_result.groups()
+                        self.logger.debug(str(get_result_final))
+                    if set_result is not None:
+                        set_result_final = set_result.groups()
+                        self.logger.debug(set_result_final)
+                    if datetime_result is not None:
+                        test_datetime = [int(datetime_result.group(i)) for i in range(1, 7)]
+                        test_datetime = datetime(*test_datetime)  # func params deconstruct
+                        datetime_result_final = test_datetime
+                        self.logger.debug(str(datetime_result_final))
+                    line = caliper.readline()
+        except FileNotFoundError:
+            self.logger.error('./caliper.log not found.')
+        self.logger.debug('results from caliper log as follows.\n' + str(get_result_final) + '\n'
+                          + str(set_result_final) + '\n' + str(datetime_result_final))
+        return datetime_result_final, get_result_final, set_result_final
 
     def __clean(self) -> None:
         """
@@ -487,7 +506,7 @@ monitor:
             self.logger.info(remove_result + "{}: /data/nodes removed.".format(host))
 
     @staticmethod
-    def __caliper_history(test_datetime: datetime) -> None:
+    def caliper_history(test_datetime: datetime) -> None:
         """
         10. only collect caliper.log & report.html once after a test.
         :param test_datetime: datetime of this test process
@@ -564,8 +583,9 @@ monitor:
         self.__copy_nodes_to_all_host()
         self.__gen_network_config()
         self.__gen_benchmark_config()
-        test_datetime, get_result, set_result = self.__test()
-        self.__caliper_history(test_datetime)
+        self.__test()
+        test_datetime, get_result, set_result = self.__gen_results()
+        self.caliper_history(test_datetime)
         self.__add_data(test_datetime, get_result, set_result)
 
 

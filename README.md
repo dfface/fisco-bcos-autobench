@@ -4,7 +4,7 @@
 * [简介](#简介)
 * [前置条件](#前置条件)
     * [安装Caliper的主机的条件](#安装Caliper的主机的条件)
-        * [node & git clone & npm install](#node-&-git-clone-&-npm-install)
+        * [node & git clone & npm install](#node--git-clone--npm-install)
         * [pip install](#pip-install)
         * [sshpass](#sshpass)
     * [安装区块链的主机的条件](#安装区块链的主机的条件)
@@ -281,3 +281,9 @@ auto benchmark 2 host(s) 5 nodes:  24%|██▍       | 32.0/132 [00:14<02:27, 
 |state_type| str |'storage'|
 |contract_path| str |'./smart_contracts/HelloWorld.sol'|
 |log_level| enum |logging.ERROR|
+
+### v2.1 版本使用步骤
+
+v2.1 将每次测试结果获取方式进行了更改，这之前是从命令行中获取，这之后从 caliper 的日志中获取。
+
+本版本是小更新，使用方法同 v2.0 。
