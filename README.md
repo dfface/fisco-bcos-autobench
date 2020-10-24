@@ -2,11 +2,11 @@
 =================
 
 * [简介](#简介)
-* [前置条件](#前置条件)
-    * [安装Caliper的主机的条件](#安装Caliper的主机的条件)
-        * [node & git clone & npm install](#node--git-clone--npm-install)
-        * [pip install](#pip-install)
-        * [sshpass](#sshpass)
+* [测试流程](#测试流程)
+* [测试须知](#测试须知)
+    * [环境](#环境)
+        * [测试机](#测试机)
+        * [部署机](#部署机)
     * [安装区块链的主机的条件](#安装区块链的主机的条件)
         * [Docker 安装与配置](#Docker-安装与配置)
         * [sshd 服务的安装与配置](#sshd-服务的安装与配置)
@@ -20,64 +20,42 @@
 ## 简介
 
 fisco-bcos-autobench 是一个用来一键【部署区块链、进行压力测试、收集实验数据】的工具，使用 python 编写，它减少了过程中的重复劳动，可节省大量时间和精力，利用简单的配置即可一键获取若干条数据，不易出错，非常适合实验数据的收集。
-## 前置条件
 
-本工具推荐使用一台主机用于测试，若干台主机用于部署区块链。也可以在测试的主机上安装区块链，如果能装得上的话。（如果没那么多主机（服务器）可用，可结合使用 VMware Workstation/Fusion 虚拟机）。
+## 测试流程
 
-### 安装Caliper的主机的条件
+本工具集成 caliper v0.3.2 ，工具内部的测试步骤为：
+1. `build_chain.sh` 生成区块链配置。
+2. 根据本工具提供的选项更改某些配置。
+3. 生成 基准测试配置文件 和 网络配置文件 供 caliper 使用。
+4. 将区块链配置复制到所有远程主机。
+5. 调用 caliper 进行测试：远程启动 Docker 容器构建起区块链，本地发起请求作为工作负载进行测试，完成之后生成报告，最后远程停止区块链。
+6. 整理报告生成测试结果。
 
-测试机首先也需要安装 Docker ，Docker 安装看官网教程，比较简单：[官方安装教程](https://docs.docker.com/engine/install/)，此外，如果需要在此主机上安装区块链就需要同时满足《安装区块链的主机的条件》。
+> 对 BCOS 部署、测试 还不熟悉？看一看 [参考资料](#参考资料) 或 [官方文档](https://fisco-bcos-documentation.readthedocs.io/zh_CN/latest/)
 
-#### node & git clone & npm install
+## 测试须知
 
-首先需要按以下步骤操作：（需 nvm、npm、git ）：
+我们把测试用的主机称为**测试机**，部署区块链的主机称为**部署机**。一般情况下，需要两台及以上的服务器进行测试，也可使用虚拟机进行模拟实验。
 
-``` bash
-# 安装 nvm 
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.36.0/install.sh | bash
-# 使用 node 8
-source ~/.$(basename $SHELL)rc
-nvm install 8
-nvm use 8
-node --version # 确认为 8，无论执行什么命令先检查 node 版本
-# 克隆本仓库
-git clone https://github.com/dfface/fisco-bcos-autobench.git
-# 安装 node 依赖
-npm install
-```
-#### pip install
+### 环境
 
-还需要安装python相关依赖（依赖在 requirements.txt 中，python 建议版本 >= 3.7）：
+"工欲善其事，必先利其器"，使用本工具的前提是配置好相应的环境。
 
-``` bash
-pip install -r requirements.txt
-```
+本工具支持测试在多主机上部署区块链。一般来说，需要一台主机满足测试机的条件，一台或多台主机满足部署机的条件。
 
-#### sshpass
+#### 测试机
 
-还需要安装系统工具 `sshpass` ，它因系统而异，推荐使用 Linux、macOS（macOS只能作为测试机，不能安装区块链），可参考 [installing SSHPASS](https://gist.github.com/arunoda/7790979)。
+1. 克隆本仓库：`git clone https://github.com/dfface/fisco-bcos-autobench.git`
+2. 安装 node 依赖： `npm install` （node 版本请保持在 v8.X.X，可使用 [nvm](https://github.com/nvm-sh/nvm) 管理）
+3. 安装 python 依赖： `pip install -r requirements.txt` （python 版本应为 v3.X.X）
 
-``` bash
-# 如果是 ubuntu
-sudo apt install -y sshpass
-# 如果是 macOS，前提是安装了 homebrew
-brew tap esolitos/ipa
-brew install sshpass
-```
+#### 部署机
 
-！！！到此为止，我这里已经有一台配置好的 Ubuntu 18.04 桌面系统虚拟机可用（使用 vmware ），下载后可直接用。
+所有主机应尽可能保持一致，特别是 `root` 用户的密码是一致的。
 
-在后面 《安装区块链的主机的条件》 完全具备之后，需要先使用 `ssh`  命令连接上**所有其他主机**，以提前保存 `fingerprint`（如果在测试阶段又新增了主机，**切记**要先手动用`ssh`连接，不然会出错）：
+1. Docker 安装与配置
 
-![image-20201007003801316](https://cdn.jsdelivr.net/gh/dfface/img0@master/0/image-20201007003801316-AndA0W-4uqKjj.png)
-
-### 安装区块链的主机的条件
-
-所有主机应尽可能保持一致，使用虚拟机的好处是可以在配置完一台之后直接复制，但需要注意复制的虚拟机需要先重启一下以更新网络等配置。此主机默认使用 Ubuntu 18.04 Server 版。
-
-#### Docker 安装与配置
-
-首先需要安装 Docker 并开启Docker Daemon服务，Docker 安装看官网教程，比较简单： https://docs.docker.com/engine/install/。
+首先需要安装 Docker 并开启Docker Daemon服务，Docker 安装看官网教程，比较简单： https://docs.docker.com/engine/install/
 
 然后需要开启 Docker Daemon 服务：
 
@@ -113,7 +91,7 @@ sudo systemctl restart docker.service
 
 ![image-20200928165131712](https://cdn.jsdelivr.net/gh/dfface/img0@master/0/image-20200928165131712-stEkHT.png)
 
-#### sshd 服务的安装与配置
+2. sshd 服务的安装与配置
 
 由于工具用到了 ssh 命令，因此需要安装并配置root用户可登录。
 
@@ -129,6 +107,41 @@ service sshd restart
 # 这之后在别的机器上可以通过 ssh 连接本机，使用脚本之前切记先 ssh 连接所有区块链主机
 ```
 
+3. 一些用到的 Linux 工具: （v3.0 暂不加入）
+
+3.1. 磁盘信息工具
+
+一般磁盘模式为 `normal` ，可安装 `apt install smartmontools` 查看信息，如:
+
+```bash
+smartctl --all /dev/sda | grep 'User Capacity' | awk -F: '{print $2}'
+        21,474,836,480 bytes [21.4 GB]
+```
+
+但是如果是磁盘阵列──`raid`模式，则需要安装 `megacli`，以 `ubuntu` 系统为例：
+
+```bash
+echo deb http://hwraid.le-vert.net/ubuntu precise main >> /etc/apt/sources.list
+wget -O - http://hwraid.le-vert.net/debian/hwraid.le-vert.net.gpg.key | sudo apt-key add -
+apt-get update
+apt-get install megacli megactl megaraid-status
+# 查看驱动器信息
+megacli -LDInfo -Lall -aALL 
+
+Adapter 0 -- Virtual Drive Information:
+Virtual Drive: 0 (Target Id: 0)
+Name                :
+RAID Level          : Primary-5, Secondary-0, RAID Level Qualifier-3
+Size                : 278.875 GB
+Sector Size         : 512
+Parity Size         : 139.437 GB
+
+```
+
+> 参考了 [ubuntu安装megacli](https://blog.csdn.net/qq_40907977/article/details/107468520) 以及 [linux 下查看硬盘型号、大小等信息（含Raid）
+](https://blog.csdn.net/harbor1981/article/details/42772377) 。
+>
+
 #### /data 文件夹的创建
 
 每台区块链主机上必须要有一个可读写的 `/data` 文件夹。
@@ -141,6 +154,11 @@ sudo chmod 777 /data
 ！！！到此为止，我这里已经有一台配置好的 Ubuntu 18.04 Server系统虚拟机可用（使用 vmware ），下载后可直接用，[地址](https://bhpan.buaa.edu.cn:443/link/D5D02F07710917781E8B9578348379C3) 有效期限：2025-11-30 23:59。
 切记在区块链主机准备好之后，先用测试用主机`ssh`连接这些主机（为了保存`fingerprint`）。
 虚拟机可复制，但要注意复制后虚拟机的 `IP` 配置。
+
+## 基准测试
+
+利用
+[](https://fisco-bcos-documentation.readthedocs.io/zh_CN/latest/docs/manual/transaction_parallel.html)
 
 ## 文件结构
 
@@ -287,3 +305,11 @@ auto benchmark 2 host(s) 5 nodes:  24%|██▍       | 32.0/132 [00:14<02:27, 
 v2.1 将每次测试结果获取方式进行了更改，这之前是从命令行中获取，这之后从 caliper 的日志中获取。
 
 本版本是小更新，使用方法同 v2.0 。
+
+## 参考资料
+
+* [性能压测工具Caliper在FISCO BCOS平台中的实践](https://fisco-bcos-documentation.readthedocs.io/zh_CN/latest/docs/articles/4_tools/46_stresstest/caliper_stress_test_practice.html)
+* [Caliper压力测试指南](https://fisco-bcos-documentation.readthedocs.io/zh_CN/latest/docs/manual/caliper.html)
+* [配置文件和配置项](https://fisco-bcos-documentation.readthedocs.io/zh_CN/latest/docs/manual/configuration.html)
+* [并行合约](https://fisco-bcos-documentation.readthedocs.io/zh_CN/latest/docs/manual/transaction_parallel.html)
+* [智能合约开发](https://fisco-bcos-documentation.readthedocs.io/zh_CN/latest/docs/manual/smart_contract.html)
