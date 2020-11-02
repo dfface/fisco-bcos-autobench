@@ -65,9 +65,9 @@ class SSH(object):
             if client is not None:
                 del client, stdin, stdout, stderr
             return out_string
-        except paramiko.ssh_exception.SSHException:
-            print("ssh error, please check ssh configuration.")
-            sys.exit(0)
+        except paramiko.ssh_exception.SSHException as e:
+            sys.stderr.write("ssh error, please check ssh configuration.")
+            sys.stderr.write(str(e))
 
     def copy_dir_from_to(self, local_dir: str, remote_dir: str) -> None:
         """
@@ -114,7 +114,7 @@ class SSH(object):
 
 class AutoBench(object):
 
-    def __init__(self, node_bin_path: str, host_addr: list, root_password: str, benchmark='helloworld', consensus_type='pbft',
+    def __init__(self, node_bin_path: str, host_addr: list, root_password: str, benchmark='transfer', consensus_type='pbft',
                  storage_type='rocksdb', tx_num=10000, tx_speed=5000, block_tx_num=1000, epoch_sealer_num=4,
                  consensus_timeout=3, epoch_block_num=1000, node_num=4, sealer_num=4, worker_num=1,
                  node_outgoing_bandwidth=0, group_flag=1, agency_flag='dfface', hardware_flag='home',
@@ -122,7 +122,7 @@ class AutoBench(object):
                  ipconfig_file_path='./network/ipconfig', p2p_start_port=30300,
                  channel_start_port=20200, jsonrpc_start_port=8545, docker_port=2375,
                  contract_type='solidity', state_type='storage', disk_type='normal',
-                 log_level=logging.ERROR, tx_per_batch=10):
+                 log_level=logging.ERROR, tx_per_batch=10, nohup=False):
         """
         initialize an AutoBench instance.
         :param node_bin_path: use command 'which npm' then you find the bin path
@@ -193,6 +193,7 @@ class AutoBench(object):
         self.docker_port = docker_port
         self.disk_type = disk_type
         self.tx_per_batch = tx_per_batch
+        self.nohup = nohup
         # 4 predefined variables
         self.node_assigned = []  # balance nodes on hosts (many functions may use)
         self.sealer_assigned = []  # balance sealer nodes on hosts (many functions may use)
@@ -208,8 +209,6 @@ class AutoBench(object):
         console_handler.setLevel(log_level)
         self.logger.addHandler(file_handler)
         self.logger.addHandler(console_handler)
-        # 6 check constraints
-        self.check_parameters()
 
     def clean(self) -> None:
         """
@@ -217,12 +216,13 @@ class AutoBench(object):
         need root & it's passwd, openssh-server, PermitRootLogin yes
         :return: None
         """
+        # local
         try:
-            shutil.rmtree("network/nodes")
+            shutil.rmtree("./network/nodes")
         except FileNotFoundError:
-            self.logger.debug("network/nodes not found.")
+            self.logger.debug("./network/nodes not found.")
         finally:
-            self.logger.debug("network/nodes cleaned.")
+            self.logger.debug("./network/nodes cleaned.")
         try:
             os.remove(self.ipconfig_file_path)
         except FileNotFoundError:
@@ -253,11 +253,12 @@ class AutoBench(object):
             self.logger.debug("./network/nodes.tar.gz not found.")
         finally:
             self.logger.debug("./network/nodes.tar.gz cleaned.")
+        # remote
         for host in self.host_addr:
             ssh = SSH(host, 'root', self.root_password)
             ssh.exec_command('rm -rf /data/nodes')
-            self.logger.info("{}: /data/nodes removed.".format(host))
-        self.logger.info("clean work finished.")
+            self.logger.debug("{}: /data/nodes removed.".format(host))
+        self.logger.info("\n### 0. ###")
 
     def check_parameters(self) -> None:
         """
@@ -285,6 +286,7 @@ class AutoBench(object):
         assert self.worker_num > 0
         assert self.node_outgoing_bandwidth >= 0
         assert self.group_flag == 1
+        self.logger.info("### 1. ###")
 
     def gen_nodes(self) -> str:
         """
@@ -310,7 +312,7 @@ class AutoBench(object):
             ipconfig_string += "{}:{} {} {} {},{},{}\n".format(host, self.node_assigned[index], self.agency_flag,
                                                                self.group_flag, self.p2p_start_port,
                                                                self.channel_start_port, self.jsonrpc_start_port)
-        self.logger.info("ipconfig file generated.\n" + ipconfig_string)
+        self.logger.debug("ipconfig file generated.\n" + ipconfig_string)
         with open(self.ipconfig_file_path, "w") as ipconfig:
             ipconfig.write(ipconfig_string)
         node_gen_command = "bash ./network/build_chain.sh -o ./network/nodes -T -f {} -d -i -s {} -c {}".format(
@@ -318,6 +320,7 @@ class AutoBench(object):
         node_generated_result = subprocess.getoutput(node_gen_command)
         self.logger.debug(node_generated_result)
         self.logger.debug("nodes folder generated.")
+        self.logger.info("### 2. ###")
         return ipconfig_string
 
     def ch_group_config(self) -> None:
@@ -366,6 +369,7 @@ class AutoBench(object):
                 os.remove(node_genesis_path)
                 shutil.copy(node0_genesis_path, node_genesis_path)
         self.logger.debug("group config files of each node have changed.")
+        self.logger.info("### 3. ###")
 
     def ch_node_config(self) -> None:
         """
@@ -389,6 +393,7 @@ class AutoBench(object):
                 os.remove(node_ini_path)
                 os.rename(node_ini_path + ".bk", node_ini_path)
         self.logger.debug("node config file generated.")
+        self.logger.info("### 4. ###")
 
     def gen_docker_scripts(self) -> tuple:
         """
@@ -402,14 +407,14 @@ class AutoBench(object):
                 start_all_string += "docker -H {host}:{docker_port} run -d --rm --name node{i} " \
                                     "-v /data/nodes/{host}/node{i}/:/data -p {p2p_port}:{p2p_port} " \
                                     "-p {channel_port}:{channel_port} -p {jsonrpc_port}:{jsonrpc_port} " \
-                                    "-w=/data fiscoorg/fiscobcos:latest -c config.ini 1> /dev/null && echo " \
+                                    "-w=/data fiscoorg/fiscobcos:v2.6.0 -c config.ini 1> /dev/null && echo " \
                                     "\"\033[32mremote {host} container node{i} started\033[0m\"\n"\
                     .format(host=host, i=i, p2p_port=self.p2p_start_port + i, channel_port=self.channel_start_port + i,
                             jsonrpc_port=self.jsonrpc_start_port + i, docker_port=self.docker_port)
                 # stop_all_string += "docker -H {host}:{docker_port} stop $(docker -H {host} ps -a | grep node{i} | " \
                                    # "cut -d \" \" -f 1) 1> /dev/null && echo \"\033[32mremote {host} container " \
                                    # "node{i} stopped\033[0m\"\n".format(host=host, i=i, docker_port=self.docker_port)
-                # delete all containers
+            # bug fix: delete all containers
             stop_all_string += "docker -H {host}:{docker_port} stop $(docker -H {host}:{docker_port} ps -q)\n"\
                 .format(host=host, docker_port=self.docker_port)
             # stop_all_string += "docker -H {host}:{docker_port} rm $(docker -H {host}:{docker_port} ps -aq)\n"\
@@ -421,6 +426,7 @@ class AutoBench(object):
         os.chmod("./network/nodes/start_all.sh", stat.S_IXOTH | stat.S_IRWXG | stat.S_IRWXU)
         os.chmod("./network/nodes/stop_all.sh", stat.S_IXOTH | stat.S_IRWXG | stat.S_IRWXU)
         self.logger.debug("start_all.sh & stop_all.sh file generated.")
+        self.logger.info("### 5. ###")
         return start_all_string, stop_all_string
 
     def copy_nodes_to_all_host(self) -> None:
@@ -429,17 +435,13 @@ class AutoBench(object):
          (include cleaning)
         :return: None
         """
-        # clean /data/nodes
-        for host in self.host_addr:
-            ssh = SSH(host, 'root', self.root_password)
-            ssh.exec_command('rm -rf /data/nodes')
-            self.logger.info("{}: /data/nodes removed.".format(host))
         for host in self.host_addr:
             ssh = SSH(host, 'root', self.root_password)
             ssh.exec_command('mkdir /data')
             ssh.copy_dir_from_to('network/nodes', '/data')
             self.logger.debug("copy to {} /data/nodes".format(host))
         self.logger.debug("copy nodes to all hosts finished.")
+        self.logger.info("### 6. ###")
 
     def gen_network_config(self) -> None:
         """
@@ -480,7 +482,7 @@ class AutoBench(object):
                     {
                         "id": "helloworld",
                         "path": "smart_contracts/helloworld/HelloWorld.sol",
-                        "language": self.contract_type,
+                        "language": "solidity",
                         "version": "v0"
                     },
                     {
@@ -506,6 +508,7 @@ class AutoBench(object):
         with open(self.network_config_file_path, "w") as network_config:
             network_config.write(json.dumps(network_config_json))
         self.logger.debug("network config file generated.")
+        self.logger.info("### 7. ###")
 
     def gen_benchmark_config(self) -> None:
         """
@@ -564,6 +567,7 @@ class AutoBench(object):
             self.logger.debug(benchmark_config)
             config.write(benchmark_config)
         self.logger.debug("benchmark config file generated.")
+        self.logger.info("### 8. ###")
 
     def run_task(self, cmd: str, desc: str, total: int) -> None:
         """
@@ -573,44 +577,55 @@ class AutoBench(object):
         :param total: total number of output Bytes
         :return: None
         """
-        try:
-            with tqdm(unit='B', unit_scale=True, miniters=1, desc=desc, total=total) as t:
-                process = subprocess.Popen(cmd, shell=True, bufsize=1, universal_newlines=True,
-                                           stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                # print subprocess output line-by-line as soon as its stdout buffer is flushed in Python 3:
-                for line in process.stdout:
-                    t.update()
-                    # forces stdout to "flush" the buffer
-                    sys.stdout.flush()
-                process.stdout.close()
-                return_code = process.wait()
-                if return_code != 0:
-                    raise subprocess.CalledProcessError(return_code, cmd)
-        except subprocess.CalledProcessError as e:
-            sys.stderr.write(
-                "common::run_command() : [ERROR]: output = %s, error code = %s\n"
-                % (e.output, e.returncode))
-            # retry
-            time.sleep(10)
+        self.logger.info(desc + "test info: " +
+            str({"tx_num": self.tx_num, "tx_send_rate": self.tx_speed,
+                 "worker_num": self.worker_num,
+                 "benchmark": self.benchmark,
+                 "contract_type": self.contract_type,
+                 "block_tx_num": self.block_tx_num,
+                 "epoch_block_num": self.epoch_block_num,
+                 "consensus_type": self.consensus_type,
+                 "consensus_timeout": self.consensus_timeout,
+                 "sealer_num": self.sealer_num,
+                 "epoch_sealer_num": self.epoch_sealer_num,
+                 "storage_type": self.storage_type,
+                 "state_type": self.state_type,
+                 "host_num": len(self.host_addr),
+                 "node_num": self.node_num,
+                 "tx_per_batch": self.tx_per_batch,
+                 "node_bandwidth_limit": self.node_outgoing_bandwidth,
+                 "host_addr": self.host_addr}))
+        if self.nohup:
             try:
-                # copy to /data/nodes (include cleaning) may have trouble
-                self.copy_nodes_to_all_host()
-                subprocess.check_call(cmd, shell=True)
+                subprocess.check_call(cmd, shell=True, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
             except subprocess.CalledProcessError as e:
                 sys.stderr.write(
                     "common::run_command() : [ERROR]: output = %s, error code = %s\n"
-                    % (e.output, e.returncode)
-                )
+                    % (e.output, e.returncode))
                 # retry
                 time.sleep(10)
-                try:
-                    self.copy_nodes_to_all_host()
-                    subprocess.check_call(cmd, shell=True)
-                except subprocess.CalledProcessError as e:
-                    sys.stderr.write(
-                        "common::run_command() : [ERROR]: output = %s, error code = %s\n"
-                        % (e.output, e.returncode)
-                    )
+                subprocess.check_call(cmd, shell=True)
+        else:
+            try:
+                with tqdm(unit='B', unit_scale=True, miniters=1, desc=desc, total=total) as t:
+                    process = subprocess.Popen(cmd, shell=True, bufsize=1, universal_newlines=True,
+                                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    # print subprocess output line-by-line as soon as its stdout buffer is flushed in Python 3:
+                    for line in process.stdout:
+                        t.update()
+                        # forces stdout to "flush" the buffer
+                        sys.stdout.flush()
+                    process.stdout.close()
+                    return_code = process.wait()
+                    if return_code != 0:
+                        raise subprocess.CalledProcessError(return_code, cmd)
+            except subprocess.CalledProcessError as e:
+                sys.stderr.write(
+                    "common::run_command() : [ERROR]: output = %s, error code = %s\n"
+                    % (e.output, e.returncode))
+                # retry
+                time.sleep(10)
+                subprocess.check_call(cmd, shell=True)
 
     def test(self) -> None:
         """
@@ -630,6 +645,7 @@ class AutoBench(object):
         self.run_task(' '.join([benchmark_command, benchmark_workspace, benchmark_config, benchmark_network]),
                            "{} host(s) {} nodes".format(len(self.host_addr), self.node_num),
                            80 + self.worker_num * 28 + self.node_num * 6)
+        self.logger.info("### 9.0 ###")
 
     def gen_results(self) -> tuple:
         """
@@ -700,9 +716,9 @@ class AutoBench(object):
             return datetime_result_final, get_result_final, set_result_final
         if self.benchmark == 'transfer':
             return datetime_result_final, add_user_result_final, transfer_result_final
+        self.logger.info("### 9.1 ###")
 
-    @staticmethod
-    def caliper_history(test_datetime: datetime) -> None:
+    def caliper_history(self, test_datetime: datetime) -> None:
         """
         10. only collect caliper.log & report.html once after a test.
         :param test_datetime: datetime of this test process
@@ -717,6 +733,7 @@ class AutoBench(object):
                         + " report.html")
         shutil.copyfile("./caliper.log", "./caliper_history/log/" + test_datetime.strftime("%Y-%m-%d %H:%M:%S")
                         + " caliper.log")
+        self.logger.info("### 10 ###")
 
     def add_data(self, test_datetime, result1, result2) -> None:
         """
@@ -777,10 +794,11 @@ class AutoBench(object):
                     "throughput": result[r][6]
                 }
                 writer.writerow(data)
+        self.logger.info("### 11. ###")
 
     def __add_hardware_data(self) -> None:
         """
-        11. add hardware data. TODO: hardware data
+        12. add hardware data. TODO: hardware data
         :return: None
         """
         # check if hardware changed: flag-ip-md5[:8]
@@ -823,9 +841,9 @@ class AutoBench(object):
                 out = ssh.exec_command("")
             # disk model
 
-    def test_once(self) -> None:
+    def __test_once_pre(self) -> None:
         """
-        test blockchain once, acquire data once.
+        one more step before test blockchain once, acquire data once.
         :return: None
         """
         self.clean()
@@ -841,6 +859,22 @@ class AutoBench(object):
         test_datetime, get_result, set_result = self.gen_results()
         self.caliper_history(test_datetime)
         self.add_data(test_datetime, get_result, set_result)
+
+    def test_once(self) -> None:
+        """
+        test blockchain once, acquire data once.
+        :return: None
+        """
+        try:
+            self.__test_once_pre()
+        except Exception:
+            try:
+                self.__test_once_pre()
+            except Exception:
+                try:
+                    self.__test_once_pre()
+                except Exception:
+                    self.__test_once_pre()
 
 
 if __name__ == '__main__':
