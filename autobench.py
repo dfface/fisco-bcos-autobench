@@ -14,6 +14,7 @@ import tarfile
 from yaml import dump
 import hashlib
 import pandas as pd
+import time
 
 # test steps:
 # 0 hardware is ready
@@ -114,14 +115,14 @@ class SSH(object):
 class AutoBench(object):
 
     def __init__(self, node_bin_path: str, host_addr: list, root_password: str, benchmark='helloworld', consensus_type='pbft',
-                 storage_type='rocksdb', tx_num=10000, tx_speed=1000, block_tx_num=1000, epoch_sealer_num=4,
+                 storage_type='rocksdb', tx_num=10000, tx_speed=5000, block_tx_num=1000, epoch_sealer_num=4,
                  consensus_timeout=3, epoch_block_num=1000, node_num=4, sealer_num=4, worker_num=1,
                  node_outgoing_bandwidth=0, group_flag=1, agency_flag='dfface', hardware_flag='home',
                  network_config_file_path='./network/fisco-bcos.json',
                  ipconfig_file_path='./network/ipconfig', p2p_start_port=30300,
                  channel_start_port=20200, jsonrpc_start_port=8545, docker_port=2375,
                  contract_type='solidity', state_type='storage', disk_type='normal',
-                 log_level=logging.ERROR):
+                 log_level=logging.ERROR, tx_per_batch=10):
         """
         initialize an AutoBench instance.
         :param node_bin_path: use command 'which npm' then you find the bin path
@@ -151,6 +152,7 @@ class AutoBench(object):
         :param docker_port: docker remote port
         :param contract_type: must be solidity/precompiled TODO: helloworld add precompiled
         :param disk_type: must be normal/raid
+        :param tx_per_batch: transfer benchmark use.
         :param state_type: must be storage TODO: mpt
         """
         # 1 system settings
@@ -190,8 +192,10 @@ class AutoBench(object):
         self.jsonrpc_start_port = jsonrpc_start_port
         self.docker_port = docker_port
         self.disk_type = disk_type
+        self.tx_per_batch = tx_per_batch
         # 4 predefined variables
         self.node_assigned = []  # balance nodes on hosts (many functions may use)
+        self.sealer_assigned = []  # balance sealer nodes on hosts (many functions may use)
         # 5 log settings
         self.logger = logging.getLogger('AutoBench')
         self.logger.setLevel(logging.DEBUG)  # must set this
@@ -287,11 +291,21 @@ class AutoBench(object):
         2. generate nodes folder.
         :return: ipconfig_string
         """
+        try:
+            shutil.rmtree("network/nodes")
+        except FileNotFoundError:
+            self.logger.debug("network/nodes not found.")
+        finally:
+            self.logger.debug("network/nodes cleaned.")
         ipconfig_string = ""  # ipconfig file content
         host_num = len(self.host_addr)
         node_num_avg = int(self.node_num / host_num)
         node_num_remain = self.node_num % host_num
         self.node_assigned = [node_num_avg] * (host_num - node_num_remain) + [node_num_avg + 1] * node_num_remain
+        sealer_num_avg = int(self.sealer_num / host_num)
+        sealer_num_remain = self.sealer_num % host_num
+        self.sealer_assigned = [sealer_num_avg] * (host_num - sealer_num_remain) + [sealer_num_avg + 1] * sealer_num_remain
+        self.logger.debug(str(self.sealer_num) + " sealers :" + str(self.sealer_assigned))
         for index, host in enumerate(self.host_addr):
             ipconfig_string += "{}:{} {} {} {},{},{}\n".format(host, self.node_assigned[index], self.agency_flag,
                                                                self.group_flag, self.p2p_start_port,
@@ -310,6 +324,19 @@ class AutoBench(object):
         """
         3. change group.1.genesis file of each node.
         """
+        # list in list
+        node_assigned_in_detail = [[] for i in range(len(self.node_assigned))]
+        node_index_count = 0
+        sealer_index_remain = []
+        for index, nodes in enumerate(self.node_assigned):
+            for i in range(0, nodes):
+                node_assigned_in_detail[index].append(node_index_count)
+                node_index_count += 1
+        self.logger.debug("node_assigned_in_detail: " + str(node_assigned_in_detail))
+        for index, sealers in enumerate(self.sealer_assigned):
+            for i in range(0, sealers):
+                sealer_index_remain.append(node_assigned_in_detail[index][i])
+        self.logger.debug("sealer_index_remain: " + str(sealer_index_remain))
         node0_genesis_path = "./network/nodes/{}/node0/conf/group.{}.genesis".format(self.host_addr[0], self.group_flag)
         with open(node0_genesis_path, "r") as group_config,\
                 open(node0_genesis_path + '.bk', "w") as group_config_bk:
@@ -324,7 +351,7 @@ class AutoBench(object):
                 sealer_node = re.match(r"\s*node.(\d)=.*", line_to_write)
                 if sealer_node:
                     # change sealers(consensusers) to sealer_num
-                    if int(sealer_node.group(1)) >= self.sealer_num:
+                    if int(sealer_node.group(1)) not in sealer_index_remain:
                         line_to_write = ""
                 group_config_bk.write(line_to_write)
         os.remove(node0_genesis_path)
@@ -379,9 +406,14 @@ class AutoBench(object):
                                     "\"\033[32mremote {host} container node{i} started\033[0m\"\n"\
                     .format(host=host, i=i, p2p_port=self.p2p_start_port + i, channel_port=self.channel_start_port + i,
                             jsonrpc_port=self.jsonrpc_start_port + i, docker_port=self.docker_port)
-                stop_all_string += "docker -H {host}:{docker_port} stop $(docker -H {host} ps -a | grep node{i} | " \
-                                   "cut -d \" \" -f 1) 1> /dev/null && echo \"\033[32mremote {host} container " \
-                                   "node{i} stopped\033[0m\"\n".format(host=host, i=i, docker_port=self.docker_port)
+                # stop_all_string += "docker -H {host}:{docker_port} stop $(docker -H {host} ps -a | grep node{i} | " \
+                                   # "cut -d \" \" -f 1) 1> /dev/null && echo \"\033[32mremote {host} container " \
+                                   # "node{i} stopped\033[0m\"\n".format(host=host, i=i, docker_port=self.docker_port)
+                # delete all containers
+            stop_all_string += "docker -H {host}:{docker_port} stop $(docker -H {host}:{docker_port} ps -q)\n"\
+                .format(host=host, docker_port=self.docker_port)
+            # stop_all_string += "docker -H {host}:{docker_port} rm $(docker -H {host}:{docker_port} ps -aq)\n"\
+            #     .format(host=host, docker_port=self.docker_port)
         with open("./network/nodes/start_all.sh", "w") as start_all:
             start_all.write(start_all_string)
         with open("./network/nodes/stop_all.sh", "w") as stop_all:
@@ -394,8 +426,14 @@ class AutoBench(object):
     def copy_nodes_to_all_host(self) -> None:
         """
         6. copy nodes to all hosts: need openssh-server, root login, /data full privileges
+         (include cleaning)
         :return: None
         """
+        # clean /data/nodes
+        for host in self.host_addr:
+            ssh = SSH(host, 'root', self.root_password)
+            ssh.exec_command('rm -rf /data/nodes')
+            self.logger.info("{}: /data/nodes removed.".format(host))
         for host in self.host_addr:
             ssh = SSH(host, 'root', self.root_password)
             ssh.exec_command('mkdir /data')
@@ -409,22 +447,17 @@ class AutoBench(object):
         :return: None
         """
         nodes_json = []
-        nodes_count = 0
         for index, host in enumerate(self.host_addr):
-            if nodes_count >= self.sealer_num:
-                break
-            for i in range(0, self.node_assigned[index]):
-                if nodes_count >= self.sealer_num:
-                    break
+            for i in range(0, self.sealer_assigned[index]):
                 node_json = {"ip": host, "rpcPort": str(self.jsonrpc_start_port + i),
                              "channelPort": str(self.channel_start_port + i)}
                 nodes_json.append(node_json)
-                nodes_count += 1
+        self.logger.debug("sealer_nodes_json: " + str(nodes_json))
         network_config_json = {
             "caliper": {
                 "blockchain": "fisco-bcos",
                 "command": {
-                    "start": "network/nodes/start_all.sh; sleep 3s",
+                    "start": "network/nodes/start_all.sh; sleep 5s",
                     "end": "network/nodes/stop_all.sh"
                 }
             },
@@ -517,6 +550,8 @@ class AutoBench(object):
                     'callback': 'benchmarks/{benchmark}/{contract_type}/{i}.js'.format(
                         benchmark=self.benchmark, contract_type=self.contract_type, i=i)
                 }
+            if i == 'transfer':
+                benchmark_rounds[i]['arguments'] = {'txnPerBatch': self.tx_per_batch}
         if self.benchmark == 'helloworld':
             benchmark_config_preview['test']['rounds'].append(benchmark_rounds['get'])
             benchmark_config_preview['test']['rounds'].append(benchmark_rounds['set'])
@@ -530,8 +565,7 @@ class AutoBench(object):
             config.write(benchmark_config)
         self.logger.debug("benchmark config file generated.")
 
-    @classmethod
-    def run_task(cls, cmd: str, desc: str, total: int) -> None:
+    def run_task(self, cmd: str, desc: str, total: int) -> None:
         """
         pack command with tqdm progress bar.
         :param cmd: command
@@ -556,6 +590,27 @@ class AutoBench(object):
             sys.stderr.write(
                 "common::run_command() : [ERROR]: output = %s, error code = %s\n"
                 % (e.output, e.returncode))
+            # retry
+            time.sleep(10)
+            try:
+                # copy to /data/nodes (include cleaning) may have trouble
+                self.copy_nodes_to_all_host()
+                subprocess.check_call(cmd, shell=True)
+            except subprocess.CalledProcessError as e:
+                sys.stderr.write(
+                    "common::run_command() : [ERROR]: output = %s, error code = %s\n"
+                    % (e.output, e.returncode)
+                )
+                # retry
+                time.sleep(10)
+                try:
+                    self.copy_nodes_to_all_host()
+                    subprocess.check_call(cmd, shell=True)
+                except subprocess.CalledProcessError as e:
+                    sys.stderr.write(
+                        "common::run_command() : [ERROR]: output = %s, error code = %s\n"
+                        % (e.output, e.returncode)
+                    )
 
     def test(self) -> None:
         """
@@ -572,7 +627,7 @@ class AutoBench(object):
         benchmark_network = "--caliper-networkconfig {}".format(self.network_config_file_path)
         self.logger.debug("auto benchmark started.")
         # print(' '.join([benchmark_command, benchmark_workspace, benchmark_config, benchmark_network]))
-        AutoBench.run_task(' '.join([benchmark_command, benchmark_workspace, benchmark_config, benchmark_network]),
+        self.run_task(' '.join([benchmark_command, benchmark_workspace, benchmark_config, benchmark_network]),
                            "{} host(s) {} nodes".format(len(self.host_addr), self.node_num),
                            80 + self.worker_num * 28 + self.node_num * 6)
 
@@ -654,9 +709,10 @@ class AutoBench(object):
         :return: None
         """
         if not os.path.exists('./caliper_history/log'):
-            os.mkdir('./caliper_history/log')
+            # fix: makedirs instead of mkdir
+            os.makedirs('./caliper_history/log')
         if not os.path.exists('./caliper_history/report'):
-            os.mkdir('./caliper_history/log')
+            os.makedirs('./caliper_history/report')
         shutil.copyfile("./report.html", "./caliper_history/report/" + test_datetime.strftime("%Y-%m-%d %H:%M:%S")
                         + " report.html")
         shutil.copyfile("./caliper.log", "./caliper_history/log/" + test_datetime.strftime("%Y-%m-%d %H:%M:%S")
@@ -681,7 +737,7 @@ class AutoBench(object):
             fields = ["datetime", "tx_num", "tx_send_rate", "worker_num", "evaluation_label", "contract_type",
                       "block_tx_num", "epoch_block_num", "consensus_type", "consensus_timeout", "sealer_num",
                       "epoch_sealer_num", "storage_type", "state_type", "host_num", "node_num", "node_bandwidth_limit",
-                      "hardware_id", "succeed_num", "fail_num", "max_latency", "min_latency", "avg_latency",
+                      "hardware_id", "tx_per_batch", "succeed_num", "fail_num", "max_latency", "min_latency", "avg_latency",
                       "throughput"]
             writer = csv.DictWriter(data_csv, fieldnames=fields)
             if not has_header:
@@ -690,7 +746,7 @@ class AutoBench(object):
             if self.benchmark == 'helloworld':
                 result = {"get": result1, "set": result2}
             if self.benchmark == 'transfer':
-                result = {"addUser": result1, "tranfer": result2}
+                result = {"addUser": result1, "transfer": result2}
             for r in result:
                 data = {
                     "datetime": str(test_datetime),
@@ -712,6 +768,7 @@ class AutoBench(object):
                     "node_bandwidth_limit": self.node_outgoing_bandwidth,
                     "hardware_id": '{}-{}-{}'.format(self.hardware_flag, len(self.host_addr),
                                                      hashlib.md5(str(self.host_addr).encode('utf8')).hexdigest()[:8]),
+                    "tx_per_batch": self.tx_per_batch,
                     "succeed_num": result[r][0],
                     "fail_num": result[r][1],
                     "max_latency": result[r][3],
@@ -742,7 +799,7 @@ class AutoBench(object):
             # out = ssh.exec_command('cat /proc/cpuinfo | grep name | cut -f2 -d: | uniq -c')
             # cpu & logical number: ('2', 'Intel(R) Core(TM) i7-8559U CPU @ 2.70GHz')
             # system_cpu_logical = re.match('\s*(\d*)\s*(.*)', out).groups()
-            out = ssh.exec_command("cat /proc/cpuinfo | grep 'model name' | uniq | awk -F: '{print $2}'") # list
+            out = ssh.exec_command("cat /proc/cpuinfo | grep 'model name' | uniq | awk -F: '{print $2}'")  # list
             cpu_model = out.strip()
             out = ssh.exec_command('cat /proc/cpuinfo | grep "processor" | wc -l')
             cpu_logical_core_num = int(out)

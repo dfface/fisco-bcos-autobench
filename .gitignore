@@ -16,5 +16,12 @@ benchmarks/helloworld/precompiled/config.yaml
 benchmarks/helloworld/solidity/config.yaml
 benchmarks/transfer/solidity/config.yaml
 benchmarks/transfer/precompiled/config.yaml
-test.py
+test_10_30.py
+upload_all.py
+test_new.py
 autobench.log
+backup.py
+draw.py
+data_all.csv
+test_per.py
+autobench.tar.gz

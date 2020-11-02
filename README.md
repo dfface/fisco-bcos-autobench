@@ -107,58 +107,12 @@ service sshd restart
 # 这之后在别的机器上可以通过 ssh 连接本机，使用脚本之前切记先 ssh 连接所有区块链主机
 ```
 
-3. 一些用到的 Linux 工具: （v3.0 暂不加入）
-
-3.1. 磁盘信息工具
-
-一般磁盘模式为 `normal` ，可安装 `apt install smartmontools` 查看信息，如:
-
-```bash
-smartctl --all /dev/sda | grep 'User Capacity' | awk -F: '{print $2}'
-        21,474,836,480 bytes [21.4 GB]
-```
-
-但是如果是磁盘阵列──`raid`模式，则需要安装 `megacli`，以 `ubuntu` 系统为例：
-
-```bash
-echo deb http://hwraid.le-vert.net/ubuntu precise main >> /etc/apt/sources.list
-wget -O - http://hwraid.le-vert.net/debian/hwraid.le-vert.net.gpg.key | sudo apt-key add -
-apt-get update
-apt-get install megacli megactl megaraid-status
-# 查看驱动器信息
-megacli -LDInfo -Lall -aALL 
-
-Adapter 0 -- Virtual Drive Information:
-Virtual Drive: 0 (Target Id: 0)
-Name                :
-RAID Level          : Primary-5, Secondary-0, RAID Level Qualifier-3
-Size                : 278.875 GB
-Sector Size         : 512
-Parity Size         : 139.437 GB
-
-```
-
-> 参考了 [ubuntu安装megacli](https://blog.csdn.net/qq_40907977/article/details/107468520) 以及 [linux 下查看硬盘型号、大小等信息（含Raid）
-](https://blog.csdn.net/harbor1981/article/details/42772377) 。
->
-
-#### /data 文件夹的创建
-
-每台区块链主机上必须要有一个可读写的 `/data` 文件夹。
-
-``` bash
-sudo mkdir /data
-sudo chmod 777 /data
-```
-
-！！！到此为止，我这里已经有一台配置好的 Ubuntu 18.04 Server系统虚拟机可用（使用 vmware ），下载后可直接用，[地址](https://bhpan.buaa.edu.cn:443/link/D5D02F07710917781E8B9578348379C3) 有效期限：2025-11-30 23:59。
-切记在区块链主机准备好之后，先用测试用主机`ssh`连接这些主机（为了保存`fingerprint`）。
-虚拟机可复制，但要注意复制后虚拟机的 `IP` 配置。
-
 ## 基准测试
 
-利用
-[](https://fisco-bcos-documentation.readthedocs.io/zh_CN/latest/docs/manual/transaction_parallel.html)
+利用[](https://fisco-bcos-documentation.readthedocs.io/zh_CN/latest/docs/manual/transaction_parallel.html)
+
+pandas  在 ubuntu 16.04 怎么安装：`sudo apt-get install python3-pandas`
+
 
 ## 文件结构
 
