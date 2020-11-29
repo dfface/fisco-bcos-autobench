@@ -122,7 +122,8 @@ class AutoBench(object):
                  ipconfig_file_path='./network/ipconfig', p2p_start_port=30300,
                  channel_start_port=20200, jsonrpc_start_port=8545, docker_port=2375,
                  contract_type='solidity', state_type='storage', disk_type='normal',
-                 log_level=logging.ERROR, tx_per_batch=10, nohup=False):
+                 log_level='info', node_log_level='info', tx_per_batch=10, nohup=False, data_file_name='data',
+                 log_file_name='autobench', docker_monitor=True):
         """
         initialize an AutoBench instance.
         :param node_bin_path: use command 'which npm' then you find the bin path
@@ -151,9 +152,11 @@ class AutoBench(object):
         :param jsonrpc_start_port: the start port of jsonrpc
         :param docker_port: docker remote port
         :param contract_type: must be solidity/precompiled TODO: helloworld add precompiled
-        :param disk_type: must be normal/raid
+        :param disk_type: must be normal/raid TODO: hardware info collection
         :param tx_per_batch: transfer benchmark use.
         :param state_type: must be storage TODO: mpt
+        :param node_log_level: must be trace/debug/info
+        :param log_level: must be error/warning/info/debug
         """
         # 1 system settings
         self.node_bin_path = node_bin_path
@@ -194,19 +197,30 @@ class AutoBench(object):
         self.disk_type = disk_type
         self.tx_per_batch = tx_per_batch
         self.nohup = nohup
+        self.data_file_name = data_file_name
+        self.node_log_level = node_log_level
+        self.docker_monitor = docker_monitor
         # 4 predefined variables
         self.node_assigned = []  # balance nodes on hosts (many functions may use)
         self.sealer_assigned = []  # balance sealer nodes on hosts (many functions may use)
         # 5 log settings
         self.logger = logging.getLogger('AutoBench')
         self.logger.setLevel(logging.DEBUG)  # must set this
+        log_level_trans = {
+            "error": logging.ERROR,
+            "warning": logging.WARNING,
+            "warn": logging.WARN,
+            "info": logging.INFO,
+            "critical": logging.CRITICAL,
+            "debug": logging.DEBUG
+        }
         log_format = logging.Formatter('%(asctime)s - %(name)s[line:%(lineno)d] - %(levelname)s: %(message)s')
-        file_handler = logging.FileHandler('./autobench.log', 'a', 'utf-8')
+        file_handler = logging.FileHandler('./{}.log'.format(log_file_name), 'a', 'utf-8')
         file_handler.setFormatter(log_format)
-        file_handler.setLevel(logging.INFO)
+        file_handler.setLevel(log_level_trans[log_level])
         console_handler = logging.StreamHandler()
         console_handler.setFormatter(log_format)
-        console_handler.setLevel(log_level)
+        console_handler.setLevel(log_level_trans[log_level])
         self.logger.addHandler(file_handler)
         self.logger.addHandler(console_handler)
 
@@ -253,12 +267,19 @@ class AutoBench(object):
             self.logger.debug("./network/nodes.tar.gz not found.")
         finally:
             self.logger.debug("./network/nodes.tar.gz cleaned.")
-        # remote
+        # remote clean
         for host in self.host_addr:
             ssh = SSH(host, 'root', self.root_password)
             ssh.exec_command('rm -rf /data/nodes')
             self.logger.debug("{}: /data/nodes removed.".format(host))
-        self.logger.info("\n### 0. ###")
+        # stop container
+        try:
+            subprocess.check_call("./network/nodes/stop_all.sh", shell=True)
+        except Exception:
+            pass
+        finally:
+            self.logger.debug("./network/nodes/stop_all.sh runned.")
+        self.logger.info("### 0. ###")
 
     def check_parameters(self) -> None:
         """
@@ -286,6 +307,7 @@ class AutoBench(object):
         assert self.worker_num > 0
         assert self.node_outgoing_bandwidth >= 0
         assert self.group_flag == 1
+        assert self.node_log_level in ['trace', 'debug', 'info']
         self.logger.info("### 1. ###")
 
     def gen_nodes(self) -> str:
@@ -315,7 +337,7 @@ class AutoBench(object):
         self.logger.debug("ipconfig file generated.\n" + ipconfig_string)
         with open(self.ipconfig_file_path, "w") as ipconfig:
             ipconfig.write(ipconfig_string)
-        node_gen_command = "bash ./network/build_chain.sh -o ./network/nodes -T -f {} -d -i -s {} -c {}".format(
+        node_gen_command = "bash ./network/build_chain.sh -o ./network/nodes -f {} -d -i -s {} -c {}".format(
             self.ipconfig_file_path, self.storage_type, self.consensus_type)
         node_generated_result = subprocess.getoutput(node_gen_command)
         self.logger.debug(node_generated_result)
@@ -328,17 +350,17 @@ class AutoBench(object):
         3. change group.1.genesis file of each node.
         """
         # list in list
-        node_assigned_in_detail = [[] for i in range(len(self.node_assigned))]
+        node_assigned_in_detail = [[] for i in range(len(self.node_assigned))]  # [2,2,3]
         node_index_count = 0
         sealer_index_remain = []
         for index, nodes in enumerate(self.node_assigned):
             for i in range(0, nodes):
-                node_assigned_in_detail[index].append(node_index_count)
+                node_assigned_in_detail[index].append(node_index_count)  # naid[0] = [0,1] naid[1] = [2,3] ...
                 node_index_count += 1
         self.logger.debug("node_assigned_in_detail: " + str(node_assigned_in_detail))
-        for index, sealers in enumerate(self.sealer_assigned):
+        for index, sealers in enumerate(self.sealer_assigned):  # [1,1,0]
             for i in range(0, sealers):
-                sealer_index_remain.append(node_assigned_in_detail[index][i])
+                sealer_index_remain.append(node_assigned_in_detail[index][i])  # sir = [0,2]
         self.logger.debug("sealer_index_remain: " + str(sealer_index_remain))
         node0_genesis_path = "./network/nodes/{}/node0/conf/group.{}.genesis".format(self.host_addr[0], self.group_flag)
         with open(node0_genesis_path, "r") as group_config,\
@@ -351,11 +373,13 @@ class AutoBench(object):
                                        str(self.consensus_timeout), line_to_write)
                 line_to_write = re.sub(r"\s*epoch_block_num=1000", "    epoch_block_num=" + str(self.epoch_block_num),
                                        line_to_write)
-                sealer_node = re.match(r"\s*node.(\d)=.*", line_to_write)
+                sealer_node = re.match(r"\s*node.(\d*)=.*", line_to_write)
                 if sealer_node:
                     # change sealers(consensusers) to sealer_num
+                    self.logger.debug(str(sealer_node.group(1)))
                     if int(sealer_node.group(1)) not in sealer_index_remain:
                         line_to_write = ""
+                self.logger.debug(line_to_write)
                 group_config_bk.write(line_to_write)
         os.remove(node0_genesis_path)
         os.rename(node0_genesis_path + '.bk', node0_genesis_path)
@@ -383,13 +407,14 @@ class AutoBench(object):
                 self.logger.debug("change ini file " + node_ini_path)
                 with open(node_ini_path, "r") as node_config, open(node_ini_path + '.bk', "w") as node_config_bk:
                     for line in node_config:
+                        line_to_write = re.sub(r"\s*level=info", "    level={}".format(self.node_log_level), line)
                         if self.node_outgoing_bandwidth > 0:
                             line_to_write = re.sub(r"\s*;outgoing_bandwidth_limit=2",
                                                    "    outgoing_bandwidth_limit=" +
-                                                   str(self.node_outgoing_bandwidth), line)
+                                                   str(self.node_outgoing_bandwidth), line_to_write)
                             node_config_bk.write(line_to_write)
                         else:
-                            node_config_bk.write(line)
+                            node_config_bk.write(line_to_write)
                 os.remove(node_ini_path)
                 os.rename(node_ini_path + ".bk", node_ini_path)
         self.logger.debug("node config file generated.")
@@ -538,6 +563,18 @@ class AutoBench(object):
                 }
             }
         }
+        if self.docker_monitor is False:
+            benchmark_config_preview = {
+                'test': {
+                    'name': self.benchmark,
+                    'description': 'This is a {} benchmark of FISCO BCOS for caliper'.format(self.benchmark),
+                    'workers': {
+                        'type': 'local',
+                        'number': self.worker_num
+                    },
+                    'rounds': []
+                }
+            }
         benchmark_rounds = {}
         for i in ['get', 'set', 'addUser', 'transfer']:
             benchmark_rounds[i] = {
@@ -577,8 +614,8 @@ class AutoBench(object):
         :param total: total number of output Bytes
         :return: None
         """
-        self.logger.info(desc + "test info: " +
-            str({"tx_num": self.tx_num, "tx_send_rate": self.tx_speed,
+        self.logger.info(desc + " test info: " +
+            str({"tx_num": self.tx_num, "tx_speed": self.tx_speed,
                  "worker_num": self.worker_num,
                  "benchmark": self.benchmark,
                  "contract_type": self.contract_type,
@@ -600,11 +637,12 @@ class AutoBench(object):
                 subprocess.check_call(cmd, shell=True, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
             except subprocess.CalledProcessError as e:
                 sys.stderr.write(
-                    "common::run_command() : [ERROR]: output = %s, error code = %s\n"
+                    "common::run_command() : [ERROR]: output = %s, error code = %s , retrying...\n"
                     % (e.output, e.returncode))
                 # retry
                 time.sleep(10)
-                subprocess.check_call(cmd, shell=True)
+                # escape from too many printed info
+                subprocess.check_call(cmd, shell=True, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
         else:
             try:
                 with tqdm(unit='B', unit_scale=True, miniters=1, desc=desc, total=total) as t:
@@ -710,13 +748,11 @@ class AutoBench(object):
                     line = caliper.readline()
         except FileNotFoundError:
             self.logger.error('./caliper.log not found.')
-        self.logger.debug('results from caliper log as follows.\n' + str(get_result_final) + '\n'
-                          + str(set_result_final) + '\n' + str(datetime_result_final))
+        self.logger.info("### 9.1 ###")
         if self.benchmark == 'helloworld':
             return datetime_result_final, get_result_final, set_result_final
         if self.benchmark == 'transfer':
             return datetime_result_final, add_user_result_final, transfer_result_final
-        self.logger.info("### 9.1 ###")
 
     def caliper_history(self, test_datetime: datetime) -> None:
         """
@@ -729,10 +765,16 @@ class AutoBench(object):
             os.makedirs('./caliper_history/log')
         if not os.path.exists('./caliper_history/report'):
             os.makedirs('./caliper_history/report')
-        shutil.copyfile("./report.html", "./caliper_history/report/" + test_datetime.strftime("%Y-%m-%d %H:%M:%S")
-                        + " report.html")
-        shutil.copyfile("./caliper.log", "./caliper_history/log/" + test_datetime.strftime("%Y-%m-%d %H:%M:%S")
-                        + " caliper.log")
+        try:
+            shutil.copyfile("./report.html", "./caliper_history/report/" + test_datetime.strftime("%Y-%m-%d %H:%M:%S")
+                            + " report.html")
+        except FileNotFoundError:
+            pass
+        try:
+            shutil.copyfile("./caliper.log", "./caliper_history/log/" + test_datetime.strftime("%Y-%m-%d %H:%M:%S")
+                            + " caliper.log")
+        except FileNotFoundError:
+            pass
         self.logger.info("### 10 ###")
 
     def add_data(self, test_datetime, result1, result2) -> None:
@@ -744,14 +786,14 @@ class AutoBench(object):
         :return: None
         """
         try:
-            with open("data.csv", 'r', newline='') as data_csv:
+            with open("{}.csv".format(self.data_file_name), 'r', newline='') as data_csv:
                 has_header = csv.Sniffer().has_header(data_csv.readline())
         except FileNotFoundError:
             has_header = False
         finally:
             pass
-        with open("data.csv", 'a', newline='') as data_csv:
-            fields = ["datetime", "tx_num", "tx_send_rate", "worker_num", "evaluation_label", "contract_type",
+        with open("{}.csv".format(self.data_file_name), 'a', newline='') as data_csv:
+            fields = ["datetime", "tx_num", "tx_speed", "tx_send_rate", "worker_num", "evaluation_label", "contract_type",
                       "block_tx_num", "epoch_block_num", "consensus_type", "consensus_timeout", "sealer_num",
                       "epoch_sealer_num", "storage_type", "state_type", "host_num", "node_num", "node_bandwidth_limit",
                       "hardware_id", "tx_per_batch", "succeed_num", "fail_num", "max_latency", "min_latency", "avg_latency",
@@ -768,6 +810,7 @@ class AutoBench(object):
                 data = {
                     "datetime": str(test_datetime),
                     "tx_num": self.tx_num,
+                    "tx_speed": self.tx_speed,
                     "tx_send_rate": result[r][2],
                     "worker_num": self.worker_num,
                     "evaluation_label": r,
@@ -868,13 +911,22 @@ class AutoBench(object):
         try:
             self.__test_once_pre()
         except Exception:
+            self.logger.info("AutoBench Test[ERROR]: something wrong, try again after 60s[1].\n")
+            time.sleep(60)
             try:
                 self.__test_once_pre()
             except Exception:
+                self.logger.info("AutoBench Test[ERROR]: something wrong, try again after 60s[2].\n")
+                time.sleep(60)
                 try:
                     self.__test_once_pre()
                 except Exception:
-                    self.__test_once_pre()
+                    self.logger.info("AutoBench Test[ERROR]: something wrong, cannot test this config, mark down[-].\n")
+                    test_datetime = datetime.now()
+                    get_result = ('-', '-', '-', '-', '-', '-', '-')
+                    set_result = ('-', '-', '-', '-', '-', '-', '-')
+                    self.caliper_history(test_datetime)
+                    self.add_data(test_datetime, get_result, set_result)
 
 
 if __name__ == '__main__':

@@ -1,5 +1,10 @@
-目录
-=================
+![fisco-bcos-autobench](https://socialify.git.ci/dfface/fisco-bcos-autobench/image?description=1&font=Inter&owner=1&pattern=Plus&theme=Light)
+
+## 简介
+
+fisco-bcos-autobench 是一个用来一键【部署区块链、进行压力测试、收集实验数据】的工具，使用 python 编写，它减少了过程中的重复劳动，可节省大量时间和精力，利用简单的配置即可一键获取若干条数据，不易出错，非常适合实验数据的收集。
+
+本说明文件涵盖以下内容：
 
 * [简介](#简介)
 * [测试流程](#测试流程)
@@ -7,23 +12,18 @@
     * [环境](#环境)
         * [测试机](#测试机)
         * [部署机](#部署机)
-    * [安装区块链的主机的条件](#安装区块链的主机的条件)
-        * [Docker 安装与配置](#Docker-安装与配置)
-        * [sshd 服务的安装与配置](#sshd-服务的安装与配置)
-        * [/data 文件夹的创建](data-文件夹的创建)
+            * [Docker 安装与配置](#Docker-安装与配置)
+            * [sshd 服务的安装与配置](#sshd-服务的安装与配置)
+* [基准测试](#基准测试)
 * [文件结构](#文件结构)
 * [使用步骤](#使用步骤)
-    * [v1.3 版本使用步骤](#v13-版本使用步骤)
-    * [v2.0 版本使用步骤](#v20-版本使用步骤)
-
-
-## 简介
-
-fisco-bcos-autobench 是一个用来一键【部署区块链、进行压力测试、收集实验数据】的工具，使用 python 编写，它减少了过程中的重复劳动，可节省大量时间和精力，利用简单的配置即可一键获取若干条数据，不易出错，非常适合实验数据的收集。
+* [使用示例](#使用示例)
+* [默认值](#默认值)
+* [阅读资料](#阅读资料)
 
 ## 测试流程
 
-本工具集成 caliper v0.3.2 ，工具内部的测试步骤为：
+本工具依赖 Caliper v0.3.2、FISCO BCOS v2.6.0 ，工具内部的测试步骤为：
 1. `build_chain.sh` 生成区块链配置。
 2. 根据本工具提供的选项更改某些配置。
 3. 生成 基准测试配置文件 和 网络配置文件 供 caliper 使用。
@@ -46,14 +46,14 @@ fisco-bcos-autobench 是一个用来一键【部署区块链、进行压力测�
 #### 测试机
 
 1. 克隆本仓库：`git clone https://github.com/dfface/fisco-bcos-autobench.git`
-2. 安装 node 依赖： `npm install` （node 版本请保持在 v8.X.X，可使用 [nvm](https://github.com/nvm-sh/nvm) 管理）
-3. 安装 python 依赖： `pip install -r requirements.txt` （python 版本应为 v3.X.X）
+2. 安装 node 依赖： `npm install` （node 版本请保持稳定版本如 v8.17.0，可使用 [nvm](https://github.com/nvm-sh/nvm) 管理）
+3. 安装 python 依赖： `pip install -r requirements.txt` （Python 版本应为 v3.7.X）
 
 #### 部署机
 
-所有主机应尽可能保持一致，特别是 `root` 用户的密码是一致的。
+所有主机应尽可能保持一致，特别是 `root` 用户的密码是一致的（为实验的方便统一一下呗）。
 
-1. Docker 安装与配置
+##### Docker 安装与配置
 
 首先需要安装 Docker 并开启Docker Daemon服务，Docker 安装看官网教程，比较简单： https://docs.docker.com/engine/install/
 
@@ -91,7 +91,7 @@ sudo systemctl restart docker.service
 
 ![image-20200928165131712](https://cdn.jsdelivr.net/gh/dfface/img0@master/0/image-20200928165131712-stEkHT.png)
 
-2. sshd 服务的安装与配置
+##### sshd 服务的安装与配置
 
 由于工具用到了 ssh 命令，因此需要安装并配置root用户可登录。
 
@@ -109,40 +109,42 @@ service sshd restart
 
 ## 基准测试
 
-利用[](https://fisco-bcos-documentation.readthedocs.io/zh_CN/latest/docs/manual/transaction_parallel.html)
+本工具包含了 Caliper V0.3.2 中适配 FISCO BCOS 的两个基准测试，更新的内容可查看 [hyperledger/caliper-benchmarks](https://github.com/hyperledger/caliper-benchmarks/tree/master/benchmarks/samples/fisco-bcos)。
 
-pandas  在 ubuntu 16.04 怎么安装：`sudo apt-get install python3-pandas`
-
+默认使用 `transfer` 而不是 `helloworld`。
 
 ## 文件结构
 
 工具使用之前的结构：
 
 ``` txt
-.
+├── README.md
 ├── autobench.py  # 自动化工具
-├── benchmark  # 基准测试文件夹
-│   ├── get.js
-│   └── set.js
-├── network  # 网络配置文件夹
-│   └── build_chain.sh
-├── smart_contracts  # 智能合约文件夹
-│   └── HelloWorld.sol
+├── benchmarks  # 基准测试文件夹，包含helloworld、transfer两种
+│   ├── helloworld
+│   └── transfer
+├── network  # 网络配置
+│   ├── build_chain.sh  # 开发部署工具
+│   └── fisco-bcos.json  # Caliper 网络配置
 ├── package-lock.json
 ├── package.json  # node 依赖
-└── requirements.txt  # python 依赖
+├── requirements.txt  # python 依赖
+├── smart_contracts  # 智能合约文件夹
+    ├── helloworld
+    └── transfer
 ```
 
-每次测试之后，会生成一些文件，可供检验此次测试情况：
+每次测试之后，会生成一些文件，可供检验此次测试情况，例如：
 
 ``` txt
 .
 ├── autobench.py
 ├── autobench.log  # 本工具的日志
 ├── benchmark
-│   ├── config.yaml  # 基准测试配置文件
-│   ├── get.js
-│   └── set.js
+│   ├── helloworld
+│   └── transfer
+│     └── solidity
+│      └── config.yaml  # 基准测试配置文件
 ├── caliper_history  # caliper 测试的历史日志和报告
 │   ├── log  # 保存了历史日志，文件夹内部文件略
 │   └── report  # 保存了历史报告，文件夹内部文件略
@@ -152,8 +154,9 @@ pandas  在 ubuntu 16.04 怎么安装：`sudo apt-get install python3-pandas`
 │   ├── ipconfig  # nodes 生成用配置文件
 │   └── nodes  # 区块链 nodes 文件夹
 ├── smart_contracts  
-│   ├── HelloWorld.address  # 合约地址
-│   └── HelloWorld.sol
+│   ├── helloworld
+│   └── transfer
+│    └── ParallelOk.address  # 合约地址
 ├── caliper.log  # 当前一轮测试的日志
 ├── report.html  # 当前一轮测试的报告
 ├── data.csv  # 累计的实验数据
@@ -164,57 +167,21 @@ pandas  在 ubuntu 16.04 怎么安装：`sudo apt-get install python3-pandas`
 
 ## 使用步骤
 
-先按照前置条件配置好主机。可以直接下载配置好的两台虚拟机，一台桌面版专供测试，一台服务器版用于复制成集群安装区块链。
+先按照前置条件配置好主机。
 
-然后用 vmware **开启所有**虚拟机，并在桌面版**测试用虚拟机登录**进入桌面，然后通过命令行`ssh`连接（使用`ssh root@192.168.XXX.XXX` 以保存 `fingerprint`）到所有**区块链用虚拟机**（也需要登录以获取局域网ip地址，使用`ifconfg`命令查看ip）。
-
-以上内容完成之后，就可以进行测试了，**除非**新增了区块链用虚拟机，**否则**无需进行任何其他操作（指的是 `ssh` 保存 `fingerprint`），后面的操作只需要用到本自动化工具。
-
-### v1.3 版本使用步骤
-
-完成前置条件之后，必须先根据系统情况修改【# 1 system settings】，然后可根据实验要求修改其他参数【# 2 test options】（例如 `host_addr` 参数等），之后直接运行即可，适合一次性任务。
-
-``` python
-# 1 system settings
-node_bin_path = "/Users/yuhanliu/.nvm/versions/node/v8.17.0/bin/"  # 'which npm' then you find the bin path
-root_password = "123456"  # must be root's password, PermitRootLogin yes (keep consistent with all hosts)
-# 2 test options
-consensus_type = "pbft"  # (pbft raft rpbft)
-storage_type = "rocksdb"  # (rocksdb mysql external scalable)
-tx_num = 10000  # the total number of transactions
-tx_speed = 1000  # the max speed of sending transactions (tps)
-block_tx_num = 1000  # the max number of transactions of a block
-epoch_sealer_num = 4  # the working sealers num of each consensus epoch
-consensus_timeout = 3  # in seconds, block consensus timeout, at least 3s
-epoch_block_num = 1000  # the number of generated blocks each epoch
-host_addr = ["192.168.177.153", "192.168.177.154"]  # the host address of each server
-node_num = 4  # the total num of nodes (sealer & follower)
-sealer_num = 4  # the total num of sealer nodes (consensusers)
-# better not to change
-worker_num = 1  # specifies the number of worker processes to use for executing the workload (caliper)
-node_outgoing_bandwidth = 0  # 0 means no limit
-```
-
-修改好参数之后，直接运行此文件即可。
-
-P.S. 区块链性能测试结果 `data.csv` 文件应不包括本基准测试的相关数据，如 `worker_num` ，为了详尽加上了所有信息，对收集的数据建议进行二次处理。
-
-### v2.0 版本使用步骤
-
-v1.x 版本采用面向过程的方式编程，而v2.0 采用面向对象的方式编程。
-
-#### 使用样例
-
-在本项目根目录下新建一个文件，如`test.py`，然后创建对象，调用`test_once`方法即可：
+然后新建一个`test.py`文件，一个简单的示例如下：
 
 ```python
 from autobench import AutoBench
 
 autobench = AutoBench("/Users/yuhanliu/.nvm/versions/node/v8.17.0/bin/",
-                      ["192.168.177.153", "192.168.177.154"],
-                      node_num=5)
+                      ["192.168.177.153", "192.168.177.154"])  # 给出了node的环境变量、两台部署机的地址
+# 这之间可对一些参数进行更改
+# 最终调用 test_once() 进行测试即可
 autobench.test_once()
 ```
+
+P.S. 区块链性能测试结果 `data.csv` 文件应不包括本基准测试的相关数据，如 `worker_num` ，为了详尽加上了所有信息，对收集的数据建议进行二次处理。
 
 输出类似：
 
@@ -222,45 +189,150 @@ autobench.test_once()
 auto benchmark 2 host(s) 5 nodes:  24%|██▍       | 32.0/132 [00:14<02:27, 1.48s/B]
 ```
 
-#### 默认值
+## 使用示例
 
-| 参数 | 类型 | 默认值 |
-| :---: | :---: | :---: |
-|node_bin_path|str| 无，必须添加，可使用 `which npm` 命令截取，如 "/Users/yuhanliu/.nvm/versions/node/v8.17.0/bin/"|
-|host_addr|list| 无，必须添加，可查看要部署区块链的主机的 IP|
-|root_password| str |（方便起见，部署区块链的所有主机应具有相同的root密码）'123456'|
-|consensus_type| str |（共识类型，可选 pbft、raft、rpbft）'pbft'|
-|storage_type| str |（存储类型）'rocksdb'|
-|tx_num| int |（测试事务总量）10000|
-|tx_speed| int |（测试事务发送速率）1000|
-|block_tx_num| int |（区块打包交易数）1000|
-|epoch_sealer_num| int |（仅对 rpbft 有效）4|
-|consensus_timeout| int |（共识超时时间，最低3s）3|
-|epoch_block_num| int |（仅对 rpbft 有效）1000|
-|node_num| int |（节点总数）4|
-|sealer_num| int |（共识节点数）4|
-|worker_num| int |（测试主机工作进程数）1|
-|node_outgoing_bandwidth| int |（节点带宽限制，0表示不限制，1表示限制1M/s）0|
-|group_flag| int |1|
-|agency_flag| str |'dfface'|
-|network_config_file_path| str |'./network/fisco-bcos.json'|
-|benchmark_config_file_path| str |'./benchmark/config.yaml'|
-|ipconfig_file_path| str |'./network/ipconfig'|
-|p2p_start_port| int |30300|
-|channel_start_port| int |20200|
-|jsonrpc_start_port| int |8545|
-|contract_type| str |'solidity'|
-|state_type| str |'storage'|
-|contract_path| str |'./smart_contracts/HelloWorld.sol'|
-|log_level| enum |logging.ERROR|
+```python
+from autobench import AutoBench
+import time
 
-### v2.1 版本使用步骤
+autobench = AutoBench("/home/ubuntu/.nvm/versions/node/v8.17.0/bin/", ['192.168.246.9'], '1qaz2wsx3edc', nohup=True, docker_monitor=False)
+autobench.worker_num = 8
+autobench.benchmark = 'transfer'
+autobench.tx_num = 50000
+autobench.tx_speed = 5000
+autobench.tx_per_batch = 10
 
-v2.1 将每次测试结果获取方式进行了更改，这之前是从命令行中获取，这之后从 caliper 的日志中获取。
+MAX_NODE_NUM = 18
+MAX_BLOCK_TX_NUM = 5000
+MIN_BLOCK_TX_NUM = 1000  # default
+STEP_BLOCK_TX_NUM = 10
+MAX_NODE_BANDWIDTH = 0  # no limit
+MIN_CONSENSUS_TIMEOUT = 3  # can not change
+MAX_CONSENSUS_TIMEOUT = 3  # no consensus timeout limit
+# rpbft
+MIN_RPBFT_EPOCH_BLOCK_NUM = 1000
+STEP_RPBFT_EPOCH_BLOCK_NUM = 10
+MAX_RPBFT_EPOCH_BLOCK_NUM = 5000
 
-本版本是小更新，使用方法同 v2.0 。
+# 断点补救，卡住了重新开始呗
+DUAN_DIAN_NODE = 7
+DUAN_DIAN_SEALER = 3
+DUAN_TX_NUM = 3260
+autobench.node_num = DUAN_DIAN_NODE
+for j in range(DUAN_DIAN_SEALER, DUAN_DIAN_NODE + 1):  # 2
+    autobench.sealer_num = j
+    for a in range(DUAN_TX_NUM, MAX_BLOCK_TX_NUM + STEP_BLOCK_TX_NUM, STEP_BLOCK_TX_NUM):  # 290 ->
+        autobench.block_tx_num = a
+        for g in ['solidity', 'precompiled']:
+            autobench.contract_type = g
+            for t in ["raft", "pbft"]:  # rpbft
+                autobench.consensus_type = t
+                # rpbft 没测
+                for b in range(0, MAX_NODE_BANDWIDTH + 1):
+                    autobench.node_outgoing_bandwidth = b
+                    for c in range(3, MAX_CONSENSUS_TIMEOUT + 1):
+                        autobench.consensus_timeout = c
+                        autobench.test_once()
+                        time.sleep(3)
 
-## 参考资料
+# rpbft 没测，node_num 从3起步
+def do_test():
+    for i in range(DUAN_DIAN_NODE + 1, MAX_NODE_NUM + 1):  # 2
+        autobench.node_num = i
+        for j in range(2, i + 1):  # 2
+            autobench.sealer_num = j
+            for a in range(MIN_BLOCK_TX_NUM, MAX_BLOCK_TX_NUM + STEP_BLOCK_TX_NUM, STEP_BLOCK_TX_NUM):  # 290 ->
+                autobench.block_tx_num = a
+                for g in ['solidity', 'precompiled']:
+                    autobench.contract_type = g
+                    for t in ["raft", "pbft"]:  # rpbft
+                        autobench.consensus_type = t
+                        # if t == "rpbft":
+                        #     for k in range(2, j + 1):
+                        #         autobench.epoch_sealer_num = k
+                        #         for f in range(MIN_RPBFT_EPOCH_BLOCK_NUM,
+                        #                        MAX_RPBFT_EPOCH_BLOCK_NUM + STEP_RPBFT_EPOCH_BLOCK_NUM,
+                        #                        STEP_RPBFT_EPOCH_BLOCK_NUM):
+                        #             autobench.epoch_block_num = f
+                        for b in range(0, MAX_NODE_BANDWIDTH + 1):
+                            autobench.node_outgoing_bandwidth = b
+                            for c in range(3, MAX_CONSENSUS_TIMEOUT + 1):
+                                autobench.consensus_timeout = c
+                                autobench.test_once()
+                                time.sleep(3)
+
+
+def do_rpbft_test():
+    autobench.contract_type = "rpbft"
+    for i in range(2, MAX_NODE_NUM + 1):  # 2
+        autobench.node_num = i
+        for j in range(2, i + 1):  # 2
+            autobench.sealer_num = j
+            for a in range(MIN_BLOCK_TX_NUM, MAX_BLOCK_TX_NUM + STEP_BLOCK_TX_NUM, STEP_BLOCK_TX_NUM):  # 290 ->
+                autobench.block_tx_num = a
+                for g in ['solidity', 'precompiled']:
+                    autobench.contract_type = g
+                    for k in range(2, j + 1):
+                        autobench.epoch_sealer_num = k
+                        for f in range(MIN_RPBFT_EPOCH_BLOCK_NUM,
+                                       MAX_RPBFT_EPOCH_BLOCK_NUM + STEP_RPBFT_EPOCH_BLOCK_NUM,
+                                       STEP_RPBFT_EPOCH_BLOCK_NUM):
+                            autobench.epoch_block_num = f
+                            for b in range(0, MAX_NODE_BANDWIDTH + 1):
+                                autobench.node_outgoing_bandwidth = b
+                                for c in range(3, MAX_CONSENSUS_TIMEOUT + 1):
+                                    autobench.consensus_timeout = c
+                                    autobench.test_once()
+                                    time.sleep(3)
+
+
+do_test()
+do_rpbft_test()
+```
+
+## 默认值
+
+| 参数 | 类型 | 含义 | 默认值 |
+| :---: | :---: | :---: | :---: |
+|node_bin_path|str| node 环境变量，可使用 `which npm` 命令截取，如 "/Users/yuhanliu/.nvm/versions/node/v8.17.0/bin/"| 无，必须添加 |
+|host_addr|list| 部署机 IP 列表| 无，必须添加 |
+|root_password| str |（方便起见，部署区块链的所有主机应具有相同的root密码）| 无，必须添加 |
+|benchmark| str |选择基准测试，可选'transfer'、'helloworld'| `'transfer'` |
+|consensus_type| str | 共识算法类型，可选 'pbft'、'raft'、'rpbft' | `'pbft'`|
+|storage_type| str |存储类型，目前仅支持'rocksdb' |`'rocksdb'`|
+|tx_num| int | 测试设定的事务总量 | `10000`|
+|tx_speed| int | 测试设定的事务发送速率 |`5000`|
+|block_tx_num| int | 区块打包交易数，一个区块最多能打包的交易数 | `1000` |
+|epoch_sealer_num| int |（仅对 rpbft 有效）每轮共识参与的共识节点数 |`4`|
+|consensus_timeout| int |PBFT共识过程中，区块执行的超时时间，最低3s |`3`|
+|epoch_block_num| int |（仅对 rpbft 有效）一个共识周期出块数目 | `1000`|
+|node_num| int |节点总数（观察节点数+共识节点数）|`4`|
+|sealer_num| int |共识节点数|`4`|
+|worker_num| int |测试主机工作进程数|`1`，建议根据CPU核心数适量增加|
+|node_outgoing_bandwidth| int |节点出带宽限制，0表示不限制，1表示限制1M/s|`0`|
+|group_flag| int |群组标识|`1`|
+|agency_flag| str |机构标识|`'dfface'`|
+|hardware_flag| str |硬件标识|`'home'`|
+|network_config_file_path| str | Caliper 网络配置文件位置 |`'./network/fisco-bcos.json'`|
+|benchmark_config_file_path| str | Caliper 基准测试配置文件位置 |`'./benchmark/config.yaml'`|
+|ipconfig_file_path| str | 开发部署工具配置文件位置 |`'./network/ipconfig'`|
+|p2p_start_port| int |p2p 起始端口号，不建议更改|`30300`|
+|channel_start_port| int |channel 起始端口号，不建议更改 |`20200`|
+|jsonrpc_start_port| int | jsonrpc 起始端口号，不建议更改 | `8545`|
+|docker_port| int | docker 远程访问端口号，若按照前置条件配置，此项无需更改 | `2375`|
+|contract_type| str |智能合约类型，transfer测试支持'precompiled'与'solidity'，helloworld仅支持'solidity'|`'solidity'`|
+|state_type| str |state 类型|`'storage'`|
+|log_level| str | 本工具日志等级，支持 warn、info、error、debug | `'info'` |
+|node_log_level| str | 区块链节点本地日志的等级，支持trace、debug、info| `'info'` |
+|tx_per_batch|int|transfer基准测试中可设定每次批量处理多少个交易|`10`|
+|nohup|bool|是否显示动态输出进度条，当使用linux的`nohup`命令时可抑制其显示，默认不显示|`False`|
+|data_file_name|str|数据收集文件名，不含后缀，仅支持`.csv`文件|`'data'`|
+|log_file_name|str|本工具日志文件名，不含后缀|`'autobench'`|
+|docker_monitor|bool|是否开启docker监控，默认开启|`True`|
+
+------
+
+## 阅读资料
 
 * [性能压测工具Caliper在FISCO BCOS平台中的实践](https://fisco-bcos-documentation.readthedocs.io/zh_CN/latest/docs/articles/4_tools/46_stresstest/caliper_stress_test_practice.html)
 * [Caliper压力测试指南](https://fisco-bcos-documentation.readthedocs.io/zh_CN/latest/docs/manual/caliper.html)
