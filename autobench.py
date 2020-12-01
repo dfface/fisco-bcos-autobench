@@ -272,13 +272,6 @@ class AutoBench(object):
             ssh = SSH(host, 'root', self.root_password)
             ssh.exec_command('rm -rf /data/nodes')
             self.logger.debug("{}: /data/nodes removed.".format(host))
-        # stop container
-        try:
-            subprocess.check_call("./network/nodes/stop_all.sh", shell=True)
-        except Exception:
-            pass
-        finally:
-            self.logger.debug("./network/nodes/stop_all.sh runned.")
         self.logger.info("### 0. ###")
 
     def check_parameters(self) -> None:
@@ -634,7 +627,7 @@ class AutoBench(object):
                  "host_addr": self.host_addr}))
         if self.nohup:
             try:
-                subprocess.check_call(cmd, shell=True, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+                subprocess.check_call(cmd, shell=True, stdout=subprocess.DEVNULL)  # must allow sterr
             except subprocess.CalledProcessError as e:
                 sys.stderr.write(
                     "common::run_command() : [ERROR]: output = %s, error code = %s , retrying...\n"
@@ -642,7 +635,7 @@ class AutoBench(object):
                 # retry
                 time.sleep(10)
                 # escape from too many printed info
-                subprocess.check_call(cmd, shell=True, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+                subprocess.check_call(cmd, shell=True, stdout=subprocess.DEVNULL)  # must allow sterr
         else:
             try:
                 with tqdm(unit='B', unit_scale=True, miniters=1, desc=desc, total=total) as t:
