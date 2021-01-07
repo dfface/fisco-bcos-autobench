@@ -123,7 +123,7 @@ class AutoBench(object):
                  channel_start_port=20200, jsonrpc_start_port=8545, docker_port=2375,
                  contract_type='solidity', state_type='storage', disk_type='normal',
                  log_level='info', node_log_level='info', tx_per_batch=10, nohup=False, data_file_name='data',
-                 log_file_name='autobench', docker_monitor=True):
+                 log_file_name='autobench', docker_monitor=True, blockchain_with_docker='fiscoorg/fiscobcos:v2.6.0'):
         """
         initialize an AutoBench instance.
         :param node_bin_path: use command 'which npm' then you find the bin path
@@ -157,6 +157,11 @@ class AutoBench(object):
         :param state_type: must be storage TODO: mpt
         :param node_log_level: must be trace/debug/info
         :param log_level: must be error/warning/info/debug
+        :param nohup: if `nohup` command on Linux will be used
+        :param data_file_name: `data.csv` can be replaced by `[data_file_name].csv`
+        :param log_file_name: `autobench.log` can be replaced by `[log_file_name].log`
+        :param docker_monitor: if docker monitor in caliper will be used
+        :param blockchain_with_docker: dockerhub tag of the target blockchain platform
         """
         # 1 system settings
         self.node_bin_path = node_bin_path
@@ -200,6 +205,7 @@ class AutoBench(object):
         self.data_file_name = data_file_name
         self.node_log_level = node_log_level
         self.docker_monitor = docker_monitor
+        self.blockchain_with_docker = blockchain_with_docker
         # 4 predefined variables
         self.node_assigned = []  # balance nodes on hosts (many functions may use)
         self.sealer_assigned = []  # balance sealer nodes on hosts (many functions may use)
@@ -425,10 +431,11 @@ class AutoBench(object):
                 start_all_string += "docker -H {host}:{docker_port} run -d --rm --name node{i} " \
                                     "-v /data/nodes/{host}/node{i}/:/data -p {p2p_port}:{p2p_port} " \
                                     "-p {channel_port}:{channel_port} -p {jsonrpc_port}:{jsonrpc_port} " \
-                                    "-w=/data fiscoorg/fiscobcos:v2.6.0 -c config.ini 1> /dev/null && echo " \
+                                    "-w=/data {blockchain_with_docker} -c config.ini 1> /dev/null && echo " \
                                     "\"\033[32mremote {host} container node{i} started\033[0m\"\n"\
                     .format(host=host, i=i, p2p_port=self.p2p_start_port + i, channel_port=self.channel_start_port + i,
-                            jsonrpc_port=self.jsonrpc_start_port + i, docker_port=self.docker_port)
+                            jsonrpc_port=self.jsonrpc_start_port + i, docker_port=self.docker_port,
+                            blockchain_with_docker=self.blockchain_with_docker)
                 # stop_all_string += "docker -H {host}:{docker_port} stop $(docker -H {host} ps -a | grep node{i} | " \
                                    # "cut -d \" \" -f 1) 1> /dev/null && echo \"\033[32mremote {host} container " \
                                    # "node{i} stopped\033[0m\"\n".format(host=host, i=i, docker_port=self.docker_port)
@@ -629,13 +636,21 @@ class AutoBench(object):
             try:
                 subprocess.check_call(cmd, shell=True, stdout=subprocess.DEVNULL)  # must allow sterr
             except subprocess.CalledProcessError as e:
+                self.logger.error("run task failed. retrying......")
                 sys.stderr.write(
                     "common::run_command() : [ERROR]: output = %s, error code = %s , retrying...\n"
                     % (e.output, e.returncode))
                 # retry
                 time.sleep(10)
                 # escape from too many printed info
-                subprocess.check_call(cmd, shell=True, stdout=subprocess.DEVNULL)  # must allow sterr
+                try:
+                    subprocess.check_call(cmd, shell=True, stdout=subprocess.DEVNULL)  # must allow sterr
+                except subprocess.CalledProcessError as e:
+                    self.logger.error("run task failed. stopped......")
+                    sys.stderr.write(
+                        "common::run_command() : [ERROR]: output = %s, error code = %s , stopped...\n"
+                        % (e.output, e.returncode))
+                    raise subprocess.CalledProcessError(0, cmd)
         else:
             try:
                 with tqdm(unit='B', unit_scale=True, miniters=1, desc=desc, total=total) as t:
@@ -651,12 +666,20 @@ class AutoBench(object):
                     if return_code != 0:
                         raise subprocess.CalledProcessError(return_code, cmd)
             except subprocess.CalledProcessError as e:
+                self.logger.error("run task failed. retrying......")
                 sys.stderr.write(
                     "common::run_command() : [ERROR]: output = %s, error code = %s\n"
                     % (e.output, e.returncode))
                 # retry
                 time.sleep(10)
-                subprocess.check_call(cmd, shell=True)
+                try:
+                    subprocess.check_call(cmd, shell=True)
+                except subprocess.CalledProcessError as e:
+                    self.logger.error("run task failed. stopped......")
+                    sys.stderr.write(
+                        "common::run_command() : [ERROR]: output = %s, error code = %s , stopped...\n"
+                        % (e.output, e.returncode))
+                    raise subprocess.CalledProcessError(0, cmd)
 
     def test(self) -> None:
         """
@@ -674,8 +697,8 @@ class AutoBench(object):
         self.logger.debug("auto benchmark started.")
         # print(' '.join([benchmark_command, benchmark_workspace, benchmark_config, benchmark_network]))
         self.run_task(' '.join([benchmark_command, benchmark_workspace, benchmark_config, benchmark_network]),
-                           "{} host(s) {} nodes".format(len(self.host_addr), self.node_num),
-                           80 + self.worker_num * 28 + self.node_num * 6)
+                      "{} host(s) {} nodes".format(len(self.host_addr), self.node_num),
+                      80 + self.worker_num * 28 + self.node_num * 6)
         self.logger.info("### 9.0 ###")
 
     def gen_results(self) -> tuple:

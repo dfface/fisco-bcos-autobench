@@ -1,77 +1,84 @@
-![fisco-bcos-autobench](https://socialify.git.ci/dfface/fisco-bcos-autobench/image?description=1&font=Inter&owner=1&pattern=Plus&theme=Light)
+![fisco-bcos-autobench](https://cdn.jsdelivr.net/gh/dfface/img0@master/1/Snipaste_2021-01-06_16-30-29.png)
 
-## 简介
+English Version | [中文版本](https://github.com/dfface/fisco-bcos-autobench/blob/master/README_zh.md)
 
-fisco-bcos-autobench 是一个用来一键【部署区块链、进行压力测试、收集实验数据】的工具，使用 python 编写，它减少了过程中的重复劳动，可节省大量时间和精力，利用简单的配置即可一键获取若干条数据，不易出错，非常适合实验数据的收集。
+## Introduction
 
-本说明文件涵盖以下内容：
+fisco-bcos-autobench is a tool used to deploy blockchain, perform stress testing, and collect experimental data with one click. 
+It is written in python. 
+It reduces duplication of labor in the process, can save a lot of time and energy, and is easy to use.
+It can get several pieces of data with one click, which is not easy to make mistakes and is very suitable for the collection of experimental data.
 
-* [简介](#简介)
-* [测试流程](#测试流程)
-* [测试须知](#测试须知)
-    * [环境](#环境)
-        * [测试机](#测试机)
-        * [部署机](#部署机)
-            * [Docker 安装与配置](#Docker-安装与配置)
-            * [sshd 服务的安装与配置](#sshd-服务的安装与配置)
-* [基准测试](#基准测试)
-* [文件结构](#文件结构)
-* [使用步骤](#使用步骤)
-* [使用示例](#使用示例)
-* [默认值](#默认值)
-* [阅读资料](#阅读资料)
+This document covers the following:
 
-## 测试流程
+* [Introduction](#introduction)
+* [Test Process](#test-process)
+* [Test Instructions](#test-instructions)
+    * [Environment](#environment)
+        * [Testing Machine](#testing-machine)
+        * [Deploying Machine](#deploying-machine)
+            * [Docker Installation and Configuration](#docker-installation-and-configuration)
+            * [sshd Service Installation and Configuration](#sshd-service-installation-and-configuration)
+* [Benchmark Test](#benchmark-test)
+* [File Structure](#file-structure)
+* [Usage](#usage)
+* [Example](#example)
+* [Default Values](#default-values)
+* [Related Information](#related-information)
 
-本工具依赖 Caliper v0.3.2、FISCO BCOS v2.6.0 ，工具内部的测试步骤为：
-1. `build_chain.sh` 生成区块链配置。
-2. 根据本工具提供的选项更改某些配置。
-3. 生成 基准测试配置文件 和 网络配置文件 供 caliper 使用。
-4. 将区块链配置复制到所有远程主机。
-5. 调用 caliper 进行测试：远程启动 Docker 容器构建起区块链，本地发起请求作为工作负载进行测试，完成之后生成报告，最后远程停止区块链。
-6. 整理报告生成测试结果。
+## Test Process
 
-> 对 BCOS 部署、测试 还不熟悉？看一看 [参考资料](#参考资料) 或 [官方文档](https://fisco-bcos-documentation.readthedocs.io/zh_CN/latest/)
+Blockchain platform based on FISCO BCOS can be tested. 
+This tool relies on Caliper v0.3.2, the test steps inside the tool are:
+1. `build_chain.sh` generates the blockchain configuration.
+2. Change some configurations according to the options provided by this tool.
+3. Generate benchmark test configuration files and network configuration files for caliper to use.
+4. Copy the blockchain configuration file to the `/data` directory of all remote hosts.
+5. Call caliper to test: remotely start the Docker container to build a blockchain, and locally initiate a request as a workload for testing
+[You can view the path of the deployment machine `/data` during testing, and save the **real-time data and log information** of the blockchain! 】, generate a report after completion, and finally stop the blockchain remotely.
+6. Organize reports and generate test results.
 
-## 测试须知
+> Not familiar with FISCO BCOS deployment and testing? Take a look at [Related Information](#related-information) or [FISCO BCOS Official Document](https://fisco-bcos-documentation.readthedocs.io/zh_CN/v2.6.0/)
 
-我们把测试用的主机称为**测试机**，部署区块链的主机称为**部署机**。一般情况下，需要两台及以上的服务器进行测试，也可使用虚拟机进行模拟实验。
+## Test Instructions
 
-### 环境
+We call the host used for testing as the **testing machine**, and the host for deploying the blockchain as the **deploying machine**. In general, two or more servers are required for testing, and virtual machines can also be used for simulation experiments.
 
-"工欲善其事，必先利其器"，使用本工具的前提是配置好相应的环境。
+### Environment
 
-本工具支持测试在多主机上部署区块链。一般来说，需要一台主机满足测试机的条件，一台或多台主机满足部署机的条件。
+"Workers must first sharpen their tools if they want to do their jobs well". The premise of using this tool is to configure the corresponding environment.
 
-#### 测试机
+This tool supports testing the deployment of blockchain on multiple hosts. Generally speaking, one host is required to meet the conditions of the test machine, and one or more hosts meet the conditions of the deployment machine.
 
-1. 克隆本仓库：`git clone https://github.com/dfface/fisco-bcos-autobench.git`
-2. 安装 node 依赖： `npm install` （node 版本请保持稳定版本如 v8.17.0，可使用 [nvm](https://github.com/nvm-sh/nvm) 管理）
-3. 安装 python 依赖： `pip install -r requirements.txt` （Python 版本应为 v3.7.X）
+#### Testing Machine
 
-#### 部署机
+1. Clone this repository: `git clone https://github.com/dfface/fisco-bcos-autobench.git`
+2. Install node dependencies: `npm install` (Please keep the node version stable, such as v8.17.0, which can be managed by [nvm](https://github.com/nvm-sh/nvm))
+3. Install python dependencies: `pip install -r requirements.txt` (Python version should be v3.7.X)
 
-所有主机应尽可能保持一致，特别是 `root` 用户的密码是一致的（为实验的方便统一一下呗）。
+#### Deploying Machine
 
-##### Docker 安装与配置
+All hosts should be consistent as much as possible, especially the password of the `root` user is consistent (unify it for the convenience of the experiment).
 
-首先需要安装 Docker 并开启Docker Daemon服务，Docker 安装看官网教程，比较简单： https://docs.docker.com/engine/install/
+##### Docker Installation and Configuration
 
-然后需要开启 Docker Daemon 服务：
+First, you need to install Docker and enable the Docker Daemon service. For Docker installation, see the official website tutorial, which is relatively simple: https://docs.docker.com/engine/install/
 
-`sudo service docker stop` 先停服务（如果是 `snap` 安装则命令为 `sudo snap stop docker`）。
+Then you need to start the Docker Daemon service:
 
-创建`/etc/docker/daemon.json`文件：
+`sudo service docker stop` first stop the service (if it is `snap` installation, the command is `sudo snap stop docker`).
+
+Create the `/etc/docker/daemon.json` file:
 
 ``` json
 {
-  "hosts" : ["unix:///var/run/docker.sock", "tcp://0.0.0.0:2375"]
+  "hosts": ["unix:///var/run/docker.sock", "tcp://0.0.0.0:2375"]
 }
 ```
 
-> “unix:///var/run/docker.sock”：UNIX套接字，本地客户端将通过这个来连接Docker Daemon； tcp://0.0.0.0:2375，TCP套接字，表示允许任何远程客户端通过2375端口连接Docker Daemon.
+> "Unix:///var/run/docker.sock": UNIX socket, the local client will connect to Docker Daemon through this; tcp://0.0.0.0:2375, TCP socket, which means any The remote client connects to Docker Daemon through port 2375.
 
-使用`sudo systemctl edit docker`新建或修改`/etc/systemd/system/docker.service.d/override.conf`
+Use `sudo systemctl edit docker` to create or modify `/etc/systemd/system/docker.service.d/override.conf`
 
 ``` ini
 ##Add this to the file for the docker daemon to use different ExecStart parameters (more things can be added here)
@@ -80,195 +87,171 @@ ExecStart=
 ExecStart=/usr/bin/dockerd
 ```
 
-重启服务：
+Restart the service:
 
 ``` bash
 sudo systemctl daemon-reload
 sudo systemctl restart docker.service
 ```
 
-此时能够在另一台机器上通过远程连接访问本机的Docker服务，例如：
+At this point, you can access the local Docker service through a remote connection on another machine, for example:
 
 ![image-20200928165131712](https://cdn.jsdelivr.net/gh/dfface/img0@master/0/image-20200928165131712-stEkHT.png)
 
-##### sshd 服务的安装与配置
+##### sshd Service Installation and Configuration
 
-由于工具用到了 ssh 命令，因此需要安装并配置root用户可登录。
+Since the tool uses the ssh command, you need to install and configure the root user to log in.
 
 ``` bash
-# 更改 root 用户密码，例如改为 123456
+# Change the root user password, for example to 123456
 sudo passwd root
-# 安装 sshd 服务
+# Install sshd service
 sudo apt-get install -y openssh-server
-# 修改配置 将 "#PermitRootLogin ..." 一行改为 "PermitRootLogin yes"
+# Modify the configuration Change the line "#PermitRootLogin ..." to "PermitRootLogin yes"
 vi /etc/ssh/sshd-config
-# 重启 sshd 服务
+# Restart sshd service
 service sshd restart
-# 这之后在别的机器上可以通过 ssh 连接本机，使用脚本之前切记先 ssh 连接所有区块链主机
+# After this, you can connect to this machine through ssh on other machines. Remember to ssh to connect to all blockchain hosts before using the script
 ```
 
-## 基准测试
+## Benchmarks
 
-本工具包含了 Caliper V0.3.2 中适配 FISCO BCOS 的两个基准测试，更新的内容可查看 [hyperledger/caliper-benchmarks](https://github.com/hyperledger/caliper-benchmarks/tree/master/benchmarks/samples/fisco-bcos)。
+This tool contains two benchmark tests adapted to FISCO BCOS in Caliper V0.3.2. The updated content can be viewed at [hyperledger/caliper-benchmarks](https://github.com/hyperledger/caliper-benchmarks/tree/master/ benchmarks/samples/fisco-bcos).
 
-默认使用 `transfer` 而不是 `helloworld`。
+By default, `transfer` is used instead of `helloworld`.
 
-## 文件结构
+## File Structure
 
-工具使用之前的结构：
+Structure before the tool is used:
 
 ``` txt
 ├── README.md
-├── autobench.py  # 自动化工具
-├── benchmarks  # 基准测试文件夹，包含helloworld、transfer两种
-│   ├── helloworld
-│   └── transfer
-├── network  # 网络配置
-│   ├── build_chain.sh  # 开发部署工具
-│   └── fisco-bcos.json  # Caliper 网络配置
+├── autobench.py ​​# Automation tool
+├── benchmarks # Benchmark test folder, including helloworld and transfer
+│ ├── helloworld
+│ └── transfer
+├── network # network configuration
+│ ├── build_chain.sh # Development and deployment tools
+│ └── fisco-bcos.json # Caliper network configuration
 ├── package-lock.json
-├── package.json  # node 依赖
-├── requirements.txt  # python 依赖
-├── smart_contracts  # 智能合约文件夹
-    ├── helloworld
-    └── transfer
+├── package.json # node dependency
+├── requirements.txt # python dependencies
+├── smart_contracts # smart contract folder
+ ├── helloworld
+ └── transfer
 ```
 
-每次测试之后，会生成一些文件，可供检验此次测试情况，例如：
+After each test, some files will be generated to verify the test situation, for example:
 
 ``` txt
 .
 ├── autobench.py
-├── autobench.log  # 本工具的日志
+├── autobench.log # This tool's log
 ├── benchmark
-│   ├── helloworld
-│   └── transfer
-│     └── solidity
-│      └── config.yaml  # 基准测试配置文件
-├── caliper_history  # caliper 测试的历史日志和报告
-│   ├── log  # 保存了历史日志，文件夹内部文件略
-│   └── report  # 保存了历史报告，文件夹内部文件略
+│ ├── helloworld
+│ └── transfer
+│ └── solidity
+│ └── config.yaml # Benchmark configuration file
+├── caliper_history # caliper test history log and report
+│ ├── log # The history log is saved, the internal files of the folder are omitted
+│ └── report # The historical report is saved, the internal files in the folder are omitted
 ├── network
-│   ├── build_chain.sh
-│   ├── fisco-bcos.json  # 网络配置文件
-│   ├── ipconfig  # nodes 生成用配置文件
-│   └── nodes  # 区块链 nodes 文件夹
-├── smart_contracts  
-│   ├── helloworld
-│   └── transfer
-│    └── ParallelOk.address  # 合约地址
-├── caliper.log  # 当前一轮测试的日志
-├── report.html  # 当前一轮测试的报告
-├── data.csv  # 累计的实验数据
+│ ├── build_chain.sh
+│ ├── fisco-bcos.json # Network configuration file
+│ ├── ipconfig # Configuration file for nodes generation
+│ └── nodes # Blockchain nodes folder
+├── smart_contracts
+│ ├── helloworld
+│ └── transfer
+│ └── ParallelOk.address # Contract address
+├── caliper.log # The log of the current round of testing
+├── report.html # The report of the current round of testing
+├── data.csv # Cumulative experimental data
 ├── package-lock.json
 ├── package.json
 └── requirements.txt
 ```
 
-## 使用步骤
+## Usage
 
-先按照前置条件配置好主机。
+First configure the host according to the preconditions.
 
-然后新建一个`test.py`文件，一个简单的示例如下：
+Then create a new `test.py` file, a simple example is as follows:
 
 ```python
 from autobench import AutoBench
 
 autobench = AutoBench("/Users/yuhanliu/.nvm/versions/node/v8.17.0/bin/",
-                      ["192.168.177.153", "192.168.177.154"])  # 给出了node的环境变量、两台部署机的地址
-# 这之间可对一些参数进行更改
-# 最终调用 test_once() 进行测试即可
+                      ["192.168.177.153", "192.168.177.154"]) # gives the environment variables of node and the addresses of the two deployment machines
+# Some parameters can be changed in between
+# Finally call test_once() to test
 autobench.test_once()
 ```
 
-P.S. 区块链性能测试结果 `data.csv` 文件应不包括本基准测试的相关数据，如 `worker_num` ，为了详尽加上了所有信息，对收集的数据建议进行二次处理。
+P.S. Blockchain performance test results The `data.csv` file should not include the relevant data of this benchmark test, such as `worker_num`. In order to add all the information in detail, it is recommended to perform secondary processing on the collected data.
 
-输出类似：
+The output is similar:
 
 ```bash
-auto benchmark 2 host(s) 5 nodes:  24%|██▍       | 32.0/132 [00:14<02:27, 1.48s/B]
+auto benchmark 2 host(s) 5 nodes: 24%|██▍ | 32.0/132 [00:14<02:27, 1.48s/B]
 ```
 
-## 使用示例
+## Example
 
 ```python
 from autobench import AutoBench
 import time
 
-autobench = AutoBench("/home/ubuntu/.nvm/versions/node/v8.17.0/bin/", ['192.168.246.9'], '1qaz2wsx3edc', nohup=True, docker_monitor=False)
-autobench.worker_num = 8
-autobench.benchmark = 'transfer'
-autobench.tx_num = 50000
-autobench.tx_speed = 5000
-autobench.tx_per_batch = 10
+# Create a test instance and configure some parameters
+autobench = AutoBench("/home/ubuntu/.nvm/versions/node/v8.17.0/bin/", ['192.168.246.9'], '1qaz2wsx3edc')
+autobench.nohup = True  # 如果使用了 Linux nohup 命令（`nohup python3 test.py &`），这里就设置为True，从而不输出进度条
+autobench.worker_num = 8  # 设置工作进程数，通常对应CPU物理核心数
+autobench.tx_num = 50000  # 发送的事务总量
+autobench.tx_speed = 5000  # 发送的事务速率
+autobench.blockchain_with_docker = 'fiscoorg/fiscobcos:v2.6.0'  # 设置区块链平台，必须是dockerhub上的基于FISCO BCOS的区块链容器
 
+# Constants
+MIN_NODE_NUM = 3
 MAX_NODE_NUM = 18
 MAX_BLOCK_TX_NUM = 5000
 MIN_BLOCK_TX_NUM = 1000  # default
 STEP_BLOCK_TX_NUM = 10
 MAX_NODE_BANDWIDTH = 0  # no limit
-MIN_CONSENSUS_TIMEOUT = 3  # can not change
+MIN_CONSENSUS_TIMEOUT = 3  
 MAX_CONSENSUS_TIMEOUT = 3  # no consensus timeout limit
-# rpbft
+
+# Threshold when testing rpbft algorithm
 MIN_RPBFT_EPOCH_BLOCK_NUM = 1000
 STEP_RPBFT_EPOCH_BLOCK_NUM = 10
 MAX_RPBFT_EPOCH_BLOCK_NUM = 5000
 
-# 断点补救，卡住了重新开始呗
-DUAN_DIAN_NODE = 7
-DUAN_DIAN_SEALER = 3
-DUAN_TX_NUM = 3260
-autobench.node_num = DUAN_DIAN_NODE
-for j in range(DUAN_DIAN_SEALER, DUAN_DIAN_NODE + 1):  # 2
-    autobench.sealer_num = j
-    for a in range(DUAN_TX_NUM, MAX_BLOCK_TX_NUM + STEP_BLOCK_TX_NUM, STEP_BLOCK_TX_NUM):  # 290 ->
-        autobench.block_tx_num = a
-        for g in ['solidity', 'precompiled']:
-            autobench.contract_type = g
-            for t in ["raft", "pbft"]:  # rpbft
-                autobench.consensus_type = t
-                # rpbft 没测
-                for b in range(0, MAX_NODE_BANDWIDTH + 1):
-                    autobench.node_outgoing_bandwidth = b
-                    for c in range(3, MAX_CONSENSUS_TIMEOUT + 1):
-                        autobench.consensus_timeout = c
-                        autobench.test_once()
-                        time.sleep(3)
-
-# rpbft 没测，node_num 从3起步
-def do_test():
-    for i in range(DUAN_DIAN_NODE + 1, MAX_NODE_NUM + 1):  # 2
+# It is better not to switch the consensus algorithm frequently during testing.
+# So we test the pbft and rpbft algorithms separately.
+def do_pbft_test():
+    for i in range(MIN_NODE_NUM, MAX_NODE_NUM + 1):
         autobench.node_num = i
-        for j in range(2, i + 1):  # 2
+        for j in range(2, i + 1):
             autobench.sealer_num = j
-            for a in range(MIN_BLOCK_TX_NUM, MAX_BLOCK_TX_NUM + STEP_BLOCK_TX_NUM, STEP_BLOCK_TX_NUM):  # 290 ->
+            for a in range(MIN_BLOCK_TX_NUM, MAX_BLOCK_TX_NUM + STEP_BLOCK_TX_NUM, STEP_BLOCK_TX_NUM):
                 autobench.block_tx_num = a
                 for g in ['solidity', 'precompiled']:
                     autobench.contract_type = g
-                    for t in ["raft", "pbft"]:  # rpbft
-                        autobench.consensus_type = t
-                        # if t == "rpbft":
-                        #     for k in range(2, j + 1):
-                        #         autobench.epoch_sealer_num = k
-                        #         for f in range(MIN_RPBFT_EPOCH_BLOCK_NUM,
-                        #                        MAX_RPBFT_EPOCH_BLOCK_NUM + STEP_RPBFT_EPOCH_BLOCK_NUM,
-                        #                        STEP_RPBFT_EPOCH_BLOCK_NUM):
-                        #             autobench.epoch_block_num = f
-                        for b in range(0, MAX_NODE_BANDWIDTH + 1):
-                            autobench.node_outgoing_bandwidth = b
-                            for c in range(3, MAX_CONSENSUS_TIMEOUT + 1):
-                                autobench.consensus_timeout = c
-                                autobench.test_once()
-                                time.sleep(3)
+                    autobench.consensus_type = 'pbft'
+                    for b in range(0, MAX_NODE_BANDWIDTH + 1):
+                        autobench.node_outgoing_bandwidth = b
+                        for c in range(3, MAX_CONSENSUS_TIMEOUT + 1):
+                            autobench.consensus_timeout = c
+                            autobench.test_once()
+                            time.sleep(3)
 
 
 def do_rpbft_test():
     autobench.contract_type = "rpbft"
-    for i in range(2, MAX_NODE_NUM + 1):  # 2
+    for i in range(MIN_NODE_NUM, MAX_NODE_NUM + 1):
         autobench.node_num = i
-        for j in range(2, i + 1):  # 2
+        for j in range(2, i + 1):
             autobench.sealer_num = j
-            for a in range(MIN_BLOCK_TX_NUM, MAX_BLOCK_TX_NUM + STEP_BLOCK_TX_NUM, STEP_BLOCK_TX_NUM):  # 290 ->
+            for a in range(MIN_BLOCK_TX_NUM, MAX_BLOCK_TX_NUM + STEP_BLOCK_TX_NUM, STEP_BLOCK_TX_NUM):
                 autobench.block_tx_num = a
                 for g in ['solidity', 'precompiled']:
                     autobench.contract_type = g
@@ -286,56 +269,56 @@ def do_rpbft_test():
                                     time.sleep(3)
 
 
-do_test()
+do_pbft_test()
 do_rpbft_test()
 ```
 
-## 默认值
+## Default Values
 
-| 参数 | 类型 | 含义 | 默认值 |
+| Parameters | Type | Meaning | Default Value |
 | :---: | :---: | :---: | :---: |
-|node_bin_path|str| node 环境变量，可使用 `which npm` 命令截取，如 "/Users/yuhanliu/.nvm/versions/node/v8.17.0/bin/"| 无，必须添加 |
-|host_addr|list| 部署机 IP 列表| 无，必须添加 |
-|root_password| str |（方便起见，部署区块链的所有主机应具有相同的root密码）| 无，必须添加 |
-|benchmark| str |选择基准测试，可选'transfer'、'helloworld'| `'transfer'` |
-|consensus_type| str | 共识算法类型，可选 'pbft'、'raft'、'rpbft' | `'pbft'`|
-|storage_type| str |存储类型，目前仅支持'rocksdb' |`'rocksdb'`|
-|tx_num| int | 测试设定的事务总量 | `10000`|
-|tx_speed| int | 测试设定的事务发送速率 |`5000`|
-|block_tx_num| int | 区块打包交易数，一个区块最多能打包的交易数 | `1000` |
-|epoch_sealer_num| int |（仅对 rpbft 有效）每轮共识参与的共识节点数 |`4`|
-|consensus_timeout| int |PBFT共识过程中，区块执行的超时时间，最低3s |`3`|
-|epoch_block_num| int |（仅对 rpbft 有效）一个共识周期出块数目 | `1000`|
-|node_num| int |节点总数（观察节点数+共识节点数）|`4`|
-|sealer_num| int |共识节点数|`4`|
-|worker_num| int |测试主机工作进程数|`1`，建议根据CPU核心数适量增加|
-|node_outgoing_bandwidth| int |节点出带宽限制，0表示不限制，1表示限制1M/s|`0`|
-|group_flag| int |群组标识|`1`|
-|agency_flag| str |机构标识|`'dfface'`|
-|hardware_flag| str |硬件标识|`'home'`|
-|network_config_file_path| str | Caliper 网络配置文件位置 |`'./network/fisco-bcos.json'`|
-|benchmark_config_file_path| str | Caliper 基准测试配置文件位置 |`'./benchmark/config.yaml'`|
-|ipconfig_file_path| str | 开发部署工具配置文件位置 |`'./network/ipconfig'`|
-|p2p_start_port| int |p2p 起始端口号，不建议更改|`30300`|
-|channel_start_port| int |channel 起始端口号，不建议更改 |`20200`|
-|jsonrpc_start_port| int | jsonrpc 起始端口号，不建议更改 | `8545`|
-|docker_port| int | docker 远程访问端口号，若按照前置条件配置，此项无需更改 | `2375`|
-|contract_type| str |智能合约类型，transfer测试支持'precompiled'与'solidity'，helloworld仅支持'solidity'|`'solidity'`|
-|state_type| str |state 类型|`'storage'`|
-|log_level| str | 本工具日志等级，支持 warn、info、error、debug | `'info'` |
-|node_log_level| str | 区块链节点本地日志的等级，支持trace、debug、info| `'info'` |
-|tx_per_batch|int|transfer基准测试中可设定每次批量处理多少个交易|`10`|
-|nohup|bool|是否显示动态输出进度条，当使用linux的`nohup`命令时可抑制其显示，默认不显示|`False`|
-|data_file_name|str|数据收集文件名，不含后缀，仅支持`.csv`文件|`'data'`|
-|log_file_name|str|本工具日志文件名，不含后缀|`'autobench'`|
-|docker_monitor|bool|是否开启docker监控，默认开启|`True`|
-
+|node_bin_path|str| node environment variable, which can be intercepted with `which npm` command, such as "/Users/yuhanliu/.nvm/versions/node/v8.17.0/bin/"| None, must be added |
+|host_addr|list| Deployment machine IP list| None, must be added |
+|root_password| str | (For convenience, all hosts where the blockchain is deployed should have the same root password) | None, must be added |
+|benchmark| str |Select benchmark test, optional'transfer','helloworld'| `'transfer'` |
+|consensus_type| str | Consensus algorithm type, optional'pbft','raft','rpbft' | `'pbft'`|
+|storage_type| str |Storage type, currently only supports'rocksdb' |`'rocksdb'`|
+|tx_num| int | The total number of transactions set by the test | `10000`|
+|tx_speed| int | Test the set transaction sending rate |`5000`|
+|block_tx_num| int | The number of block packaged transactions, the maximum number of transactions that can be packaged in a block | `1000` |
+|epoch_sealer_num| int | (Only valid for rpbft) The number of consensus nodes participating in each round of consensus |`4`|
+|consensus_timeout| int |In the PBFT consensus process, the block execution timeout time, minimum 3s |`3`|
+|epoch_block_num| int | (Only valid for rpbft) Number of blocks produced in one consensus cycle | `1000`|
+|node_num| int |Total number of nodes (number of observation nodes + number of consensus nodes)|`4`|
+|sealer_num| int |Number of consensus nodes|`4`|
+|worker_num| int |The number of worker processes of the test host|`1`, it is recommended to increase according to the number of CPU cores|
+|node_outgoing_bandwidth| int |Node outgoing bandwidth limit, 0 means no limit, 1 means limit 1M/s|`0`|
+|group_flag| int |group flag|`1`|
+|agency_flag| str |Agency flag|`'dfface'`|
+|hardware_flag| str |Hardware flag|`'home'`|
+|network_config_file_path| str | Caliper network configuration file location |`'./network/fisco-bcos.json'`|
+|benchmark_config_file_path| str | Caliper benchmark configuration file location |`'./benchmark/config.yaml'`|
+|ipconfig_file_path| str | Development and deployment tool configuration file location |`'./network/ipconfig'`|
+|p2p_start_port| int |p2p start port number, it is not recommended to change |`30300`|
+|channel_start_port| int |channel start port number, it is not recommended to change |`20200`|
+|jsonrpc_start_port| int | jsonrpc starting port number, it is not recommended to change | `8545`|
+|docker_port| int | docker remote access port number, if configured according to the preconditions, this item does not need to be changed | `2375`|
+|contract_type| str |Smart contract type, transfer test supports'precompiled' and'solidity', helloworld only supports'solidity'|`'solidity'`|
+|state_type| str |state type|`'storage'`|
+|log_level| str | The log level of this tool, support warn, info, error, debug | `'info'` |
+|node_log_level| str | The level of the local log of the blockchain node, which supports trace, debug, info| `'info'` |
+In the |tx_per_batch|int|transfer benchmark test, you can set how many transactions are processed in batches each time|`10`|
+|nohup|bool|Whether to display the dynamic output progress bar, when using the linux `nohup` command (`True`), its display can be suppressed (ie not displayed), the default display |`False`|
+|data_file_name|str|Data collection file name without suffix, only `.csv` file is supported|`'data'`|
+|log_file_name|str|The log file name of this tool without suffix|`'autobench'`|
+|docker_monitor|bool|Whether to enable docker monitoring, it is enabled by default |`True`|
+|blockchain_with_docker|str|FICSO BCOS-based blockchain container on dockerhub|`'fiscoorg/fiscobcos:v2.6.0'`|
 ------
 
-## 阅读资料
+## Related Information
 
-* [性能压测工具Caliper在FISCO BCOS平台中的实践](https://fisco-bcos-documentation.readthedocs.io/zh_CN/latest/docs/articles/4_tools/46_stresstest/caliper_stress_test_practice.html)
-* [Caliper压力测试指南](https://fisco-bcos-documentation.readthedocs.io/zh_CN/latest/docs/manual/caliper.html)
-* [配置文件和配置项](https://fisco-bcos-documentation.readthedocs.io/zh_CN/latest/docs/manual/configuration.html)
-* [并行合约](https://fisco-bcos-documentation.readthedocs.io/zh_CN/latest/docs/manual/transaction_parallel.html)
-* [智能合约开发](https://fisco-bcos-documentation.readthedocs.io/zh_CN/latest/docs/manual/smart_contract.html)
+* [Practice of Caliper, a performance stress measurement tool in the FISCO BCOS platform](https://fisco-bcos-documentation.readthedocs.io/zh_CN/v2.6.0/docs/articles/4_tools/46_stresstest/caliper_stress_test_practice.html)
+* [Caliper Stress Test Guide](https://fisco-bcos-documentation.readthedocs.io/zh_CN/v2.6.0/docs/manual/caliper.html)
+* [Configuration files and configuration items](https://fisco-bcos-documentation.readthedocs.io/zh_CN/v2.6.0/docs/manual/configuration.html)
+* [Parallel Contract](https://fisco-bcos-documentation.readthedocs.io/zh_CN/v2.6.0/docs/manual/transaction_parallel.html)
+* [Smart Contract Development](https://fisco-bcos-documentation.readthedocs.io/zh_CN/v2.6.0/docs/manual/smart_contract.html)
