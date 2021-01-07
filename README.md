@@ -116,7 +116,7 @@ service sshd restart
 
 ## Benchmark Test
 
-This tool contains two benchmark tests adapted to FISCO BCOS in Caliper V0.3.2. The updated content can be viewed at [hyperledger/caliper-benchmarks](https://github.com/hyperledger/caliper-benchmarks/tree/master/ benchmarks/samples/fisco-bcos).
+This tool contains two benchmark tests adapted to FISCO BCOS in Caliper V0.3.2. The updated content can be viewed at [hyperledger/caliper-benchmarks](https://github.com/hyperledger/caliper-benchmarks/tree/master/benchmarks/samples/fisco-bcos).
 
 By default, `transfer` is used instead of `helloworld`.
 
