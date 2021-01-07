@@ -114,7 +114,7 @@ service sshd restart
 # After this, you can connect to this machine through ssh on other machines. Remember to ssh to connect to all blockchain hosts before using the script
 ```
 
-## Benchmarks
+## Benchmark Test
 
 This tool contains two benchmark tests adapted to FISCO BCOS in Caliper V0.3.2. The updated content can be viewed at [hyperledger/caliper-benchmarks](https://github.com/hyperledger/caliper-benchmarks/tree/master/ benchmarks/samples/fisco-bcos).
 
@@ -204,11 +204,11 @@ import time
 
 # Create a test instance and configure some parameters
 autobench = AutoBench("/home/ubuntu/.nvm/versions/node/v8.17.0/bin/", ['192.168.246.9'], '1qaz2wsx3edc')
-autobench.nohup = True  # 如果使用了 Linux nohup 命令（`nohup python3 test.py &`），这里就设置为True，从而不输出进度条
-autobench.worker_num = 8  # 设置工作进程数，通常对应CPU物理核心数
-autobench.tx_num = 50000  # 发送的事务总量
-autobench.tx_speed = 5000  # 发送的事务速率
-autobench.blockchain_with_docker = 'fiscoorg/fiscobcos:v2.6.0'  # 设置区块链平台，必须是dockerhub上的基于FISCO BCOS的区块链容器
+autobench.nohup = True  # If the Linux nohup command (`nohup python3 test.py &`) is used, set it to True here, so no progress bar is output
+autobench.worker_num = 8  # Set the number of worker processes, usually corresponding to the number of physical CPU cores
+autobench.tx_num = 50000  # Total number of transactions sent
+autobench.tx_speed = 5000  # Transaction rate sent
+autobench.blockchain_with_docker = 'fiscoorg/fiscobcos:v2.6.0'  # To set up a blockchain platform, it must be a FISCO BCOS-based blockchain container on dockerhub
 
 # Constants
 MIN_NODE_NUM = 3
