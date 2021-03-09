@@ -307,7 +307,7 @@ do_rpbft_test()
 |state_type| str |state type|`'storage'`|
 |log_level| str | The log level of this tool, support warn, info, error, debug | `'info'` |
 |node_log_level| str | The level of the local log of the blockchain node, which supports trace, debug, info| `'info'` |
-In the |tx_per_batch|int|transfer benchmark test, you can set how many transactions are processed in batches each time|`10`|
+| tx_per_batch | int | transfer benchmark test, you can set how many transactions are processed in batches each time|`10`|
 |nohup|bool|Whether to display the dynamic output progress bar, when using the linux `nohup` command (`True`), its display can be suppressed (ie not displayed), the default display |`False`|
 |data_file_name|str|Data collection file name without suffix, only `.csv` file is supported|`'data'`|
 |log_file_name|str|The log file name of this tool without suffix|`'autobench'`|
