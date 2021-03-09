@@ -123,7 +123,8 @@ class AutoBench(object):
                  channel_start_port=20200, jsonrpc_start_port=8545, docker_port=2375,
                  contract_type='solidity', state_type='storage', disk_type='normal',
                  log_level='info', node_log_level='info', tx_per_batch=10, nohup=False, data_file_name='data',
-                 log_file_name='autobench', docker_monitor=True, blockchain_with_docker='fiscoorg/fiscobcos:v2.6.0'):
+                 log_file_name='autobench', docker_monitor=True, blockchain_with_docker='fiscoorg/fiscobcos:v2.6.0',
+                 remote_data_path='/data'):
         """
         initialize an AutoBench instance.
         :param node_bin_path: use command 'which npm' then you find the bin path
@@ -162,6 +163,7 @@ class AutoBench(object):
         :param log_file_name: `autobench.log` can be replaced by `[log_file_name].log`
         :param docker_monitor: if docker monitor in caliper will be used
         :param blockchain_with_docker: dockerhub tag of the target blockchain platform
+        :param remote_data_path: change remote /data to /xxx/data
         """
         # 1 system settings
         self.node_bin_path = node_bin_path
@@ -206,6 +208,7 @@ class AutoBench(object):
         self.node_log_level = node_log_level
         self.docker_monitor = docker_monitor
         self.blockchain_with_docker = blockchain_with_docker
+        self.remote_data_path = remote_data_path
         # 4 predefined variables
         self.node_assigned = []  # balance nodes on hosts (many functions may use)
         self.sealer_assigned = []  # balance sealer nodes on hosts (many functions may use)
@@ -276,9 +279,9 @@ class AutoBench(object):
         # remote clean
         for host in self.host_addr:
             ssh = SSH(host, 'root', self.root_password)
-            ssh.exec_command('rm -rf /data/nodes')
-            self.logger.debug("{}: /data/nodes removed.".format(host))
-        self.logger.info("### 0. ###")
+            ssh.exec_command('rm -rf {}/nodes'.format(self.remote_data_path))
+            self.logger.debug("{}: {}/nodes removed.".format(host, self.remote_data_path))
+        self.logger.info("### 0. clean up before every test ###")
 
     def check_parameters(self) -> None:
         """
@@ -307,7 +310,7 @@ class AutoBench(object):
         assert self.node_outgoing_bandwidth >= 0
         assert self.group_flag == 1
         assert self.node_log_level in ['trace', 'debug', 'info']
-        self.logger.info("### 1. ###")
+        self.logger.info("### 1. check parameters' constraints before every test ###")
 
     def gen_nodes(self) -> str:
         """
@@ -341,7 +344,7 @@ class AutoBench(object):
         node_generated_result = subprocess.getoutput(node_gen_command)
         self.logger.debug(node_generated_result)
         self.logger.debug("nodes folder generated.")
-        self.logger.info("### 2. ###")
+        self.logger.info("### 2. generate nodes folder ###")
         return ipconfig_string
 
     def ch_group_config(self) -> None:
@@ -392,7 +395,7 @@ class AutoBench(object):
                 os.remove(node_genesis_path)
                 shutil.copy(node0_genesis_path, node_genesis_path)
         self.logger.debug("group config files of each node have changed.")
-        self.logger.info("### 3. ###")
+        self.logger.info("### 3. change group.1.genesis file of each node ###")
 
     def ch_node_config(self) -> None:
         """
@@ -417,7 +420,7 @@ class AutoBench(object):
                 os.remove(node_ini_path)
                 os.rename(node_ini_path + ".bk", node_ini_path)
         self.logger.debug("node config file generated.")
-        self.logger.info("### 4. ###")
+        self.logger.info("### 4. change config.ini file of each node ###")
 
     def gen_docker_scripts(self) -> tuple:
         """
@@ -429,19 +432,19 @@ class AutoBench(object):
         for index, host in enumerate(self.host_addr):
             for i in range(0, self.node_assigned[index]):
                 start_all_string += "docker -H {host}:{docker_port} run -d --rm --name node{i} " \
-                                    "-v /data/nodes/{host}/node{i}/:/data -p {p2p_port}:{p2p_port} " \
+                                    "-v {remote_data_path}/nodes/{host}/node{i}/:/data -p {p2p_port}:{p2p_port} " \
                                     "-p {channel_port}:{channel_port} -p {jsonrpc_port}:{jsonrpc_port} " \
                                     "-w=/data {blockchain_with_docker} -c config.ini 1> /dev/null && echo " \
                                     "\"\033[32mremote {host} container node{i} started\033[0m\"\n"\
                     .format(host=host, i=i, p2p_port=self.p2p_start_port + i, channel_port=self.channel_start_port + i,
                             jsonrpc_port=self.jsonrpc_start_port + i, docker_port=self.docker_port,
-                            blockchain_with_docker=self.blockchain_with_docker)
-                # stop_all_string += "docker -H {host}:{docker_port} stop $(docker -H {host} ps -a | grep node{i} | " \
-                                   # "cut -d \" \" -f 1) 1> /dev/null && echo \"\033[32mremote {host} container " \
-                                   # "node{i} stopped\033[0m\"\n".format(host=host, i=i, docker_port=self.docker_port)
+                            blockchain_with_docker=self.blockchain_with_docker, remote_data_path=self.remote_data_path)
+                stop_all_string += "docker -H {host}:{docker_port} stop $(docker -H {host} ps -a | grep node{i} | " \
+                                   "cut -d \" \" -f 1) 1> /dev/null && echo \"\033[32mremote {host} container " \
+                                   "node{i} stopped\033[0m\"\n".format(host=host, i=i, docker_port=self.docker_port)
             # bug fix: delete all containers
-            stop_all_string += "docker -H {host}:{docker_port} stop $(docker -H {host}:{docker_port} ps -q)\n"\
-                .format(host=host, docker_port=self.docker_port)
+            # stop_all_string += "docker -H {host}:{docker_port} stop $(docker -H {host}:{docker_port} ps -q)\n"\
+                # .format(host=host, docker_port=self.docker_port)
             # stop_all_string += "docker -H {host}:{docker_port} rm $(docker -H {host}:{docker_port} ps -aq)\n"\
             #     .format(host=host, docker_port=self.docker_port)
         with open("./network/nodes/start_all.sh", "w") as start_all:
@@ -451,7 +454,7 @@ class AutoBench(object):
         os.chmod("./network/nodes/start_all.sh", stat.S_IXOTH | stat.S_IRWXG | stat.S_IRWXU)
         os.chmod("./network/nodes/stop_all.sh", stat.S_IXOTH | stat.S_IRWXG | stat.S_IRWXU)
         self.logger.debug("start_all.sh & stop_all.sh file generated.")
-        self.logger.info("### 5. ###")
+        self.logger.info("### 5. generate start & stop scripts ###")
         return start_all_string, stop_all_string
 
     def copy_nodes_to_all_host(self) -> None:
@@ -462,11 +465,11 @@ class AutoBench(object):
         """
         for host in self.host_addr:
             ssh = SSH(host, 'root', self.root_password)
-            ssh.exec_command('mkdir /data')
-            ssh.copy_dir_from_to('network/nodes', '/data')
-            self.logger.debug("copy to {} /data/nodes".format(host))
+            ssh.exec_command('mkdir {}'.format(self.remote_data_path))
+            ssh.copy_dir_from_to('network/nodes', self.remote_data_path)
+            self.logger.debug("copy to {} {}/nodes".format(host, self.remote_data_path))
         self.logger.debug("copy nodes to all hosts finished.")
-        self.logger.info("### 6. ###")
+        self.logger.info("### 6. copy nodes to all hosts ###")
 
     def gen_network_config(self) -> None:
         """
@@ -533,7 +536,7 @@ class AutoBench(object):
         with open(self.network_config_file_path, "w") as network_config:
             network_config.write(json.dumps(network_config_json))
         self.logger.debug("network config file generated.")
-        self.logger.info("### 7. ###")
+        self.logger.info("### 7. generate network config file ###")
 
     def gen_benchmark_config(self) -> None:
         """
@@ -604,7 +607,7 @@ class AutoBench(object):
             self.logger.debug(benchmark_config)
             config.write(benchmark_config)
         self.logger.debug("benchmark config file generated.")
-        self.logger.info("### 8. ###")
+        self.logger.info("### 8. generate benchmark config file ###")
 
     def run_task(self, cmd: str, desc: str, total: int) -> None:
         """
@@ -699,7 +702,7 @@ class AutoBench(object):
         self.run_task(' '.join([benchmark_command, benchmark_workspace, benchmark_config, benchmark_network]),
                       "{} host(s) {} nodes".format(len(self.host_addr), self.node_num),
                       80 + self.worker_num * 28 + self.node_num * 6)
-        self.logger.info("### 9.0 ###")
+        self.logger.info("### 9.0 auto benchmark test ###")
 
     def gen_results(self) -> tuple:
         """
@@ -764,7 +767,7 @@ class AutoBench(object):
                     line = caliper.readline()
         except FileNotFoundError:
             self.logger.error('./caliper.log not found.')
-        self.logger.info("### 9.1 ###")
+        self.logger.info("### 9.1 generate results from caliper log file ###")
         if self.benchmark == 'helloworld':
             return datetime_result_final, get_result_final, set_result_final
         if self.benchmark == 'transfer':
@@ -791,7 +794,7 @@ class AutoBench(object):
                             + " caliper.log")
         except FileNotFoundError:
             pass
-        self.logger.info("### 10 ###")
+        self.logger.info("### 10 collect caliper.log & report.html after a test ###")
 
     def add_data(self, test_datetime, result1, result2) -> None:
         """
@@ -853,7 +856,7 @@ class AutoBench(object):
                     "throughput": result[r][6]
                 }
                 writer.writerow(data)
-        self.logger.info("### 11. ###")
+        self.logger.info("### 11. add data to data.csv ###")
 
     def __add_hardware_data(self) -> None:
         """
