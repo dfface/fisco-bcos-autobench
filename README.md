@@ -22,7 +22,6 @@ This document covers the following:
 * [Benchmark Test](#benchmark-test)
 * [File Structure](#file-structure)
 * [Usage](#usage)
-* [Example](#example)
 * [Default Values](#default-values)
 * [Related Information](#related-information)
 
@@ -194,83 +193,6 @@ The output is similar:
 
 ```bash
 auto benchmark 2 host(s) 5 nodes: 24%|██▍ | 32.0/132 [00:14<02:27, 1.48s/B]
-```
-
-## Example
-
-```python
-from autobench import AutoBench
-import time
-
-# Create a test instance and configure some parameters
-autobench = AutoBench("/home/ubuntu/.nvm/versions/node/v8.17.0/bin/", ['192.168.246.9'], '1qaz2wsx3edc')
-autobench.nohup = True  # If the Linux nohup command (`nohup python3 test.py &`) is used, set it to True here, so no progress bar is output
-autobench.worker_num = 8  # Set the number of worker processes, usually corresponding to the number of physical CPU cores
-autobench.tx_num = 50000  # Total number of transactions sent
-autobench.tx_speed = 5000  # Transaction rate sent
-autobench.blockchain_with_docker = 'fiscoorg/fiscobcos:v2.6.0'  # To set up a blockchain platform, it must be a FISCO BCOS-based blockchain container on dockerhub
-
-# Constants
-MIN_NODE_NUM = 3
-MAX_NODE_NUM = 18
-MAX_BLOCK_TX_NUM = 5000
-MIN_BLOCK_TX_NUM = 1000  # default
-STEP_BLOCK_TX_NUM = 10
-MAX_NODE_BANDWIDTH = 0  # no limit
-MIN_CONSENSUS_TIMEOUT = 3  
-MAX_CONSENSUS_TIMEOUT = 3  # no consensus timeout limit
-
-# Threshold when testing rpbft algorithm
-MIN_RPBFT_EPOCH_BLOCK_NUM = 1000
-STEP_RPBFT_EPOCH_BLOCK_NUM = 10
-MAX_RPBFT_EPOCH_BLOCK_NUM = 5000
-
-# It is better not to switch the consensus algorithm frequently during testing.
-# So we test the pbft and rpbft algorithms separately.
-def do_pbft_test():
-    for i in range(MIN_NODE_NUM, MAX_NODE_NUM + 1):
-        autobench.node_num = i
-        for j in range(2, i + 1):
-            autobench.sealer_num = j
-            for a in range(MIN_BLOCK_TX_NUM, MAX_BLOCK_TX_NUM + STEP_BLOCK_TX_NUM, STEP_BLOCK_TX_NUM):
-                autobench.block_tx_num = a
-                for g in ['solidity', 'precompiled']:
-                    autobench.contract_type = g
-                    autobench.consensus_type = 'pbft'
-                    for b in range(0, MAX_NODE_BANDWIDTH + 1):
-                        autobench.node_outgoing_bandwidth = b
-                        for c in range(3, MAX_CONSENSUS_TIMEOUT + 1):
-                            autobench.consensus_timeout = c
-                            autobench.test_once()
-                            time.sleep(3)
-
-
-def do_rpbft_test():
-    autobench.contract_type = "rpbft"
-    for i in range(MIN_NODE_NUM, MAX_NODE_NUM + 1):
-        autobench.node_num = i
-        for j in range(2, i + 1):
-            autobench.sealer_num = j
-            for a in range(MIN_BLOCK_TX_NUM, MAX_BLOCK_TX_NUM + STEP_BLOCK_TX_NUM, STEP_BLOCK_TX_NUM):
-                autobench.block_tx_num = a
-                for g in ['solidity', 'precompiled']:
-                    autobench.contract_type = g
-                    for k in range(2, j + 1):
-                        autobench.epoch_sealer_num = k
-                        for f in range(MIN_RPBFT_EPOCH_BLOCK_NUM,
-                                       MAX_RPBFT_EPOCH_BLOCK_NUM + STEP_RPBFT_EPOCH_BLOCK_NUM,
-                                       STEP_RPBFT_EPOCH_BLOCK_NUM):
-                            autobench.epoch_block_num = f
-                            for b in range(0, MAX_NODE_BANDWIDTH + 1):
-                                autobench.node_outgoing_bandwidth = b
-                                for c in range(3, MAX_CONSENSUS_TIMEOUT + 1):
-                                    autobench.consensus_timeout = c
-                                    autobench.test_once()
-                                    time.sleep(3)
-
-
-do_pbft_test()
-do_rpbft_test()
 ```
 
 ## Default Values
