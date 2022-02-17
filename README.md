@@ -34,7 +34,7 @@ This tool relies on Caliper v0.3.2, the test steps inside the tool are:
 3. Generate benchmark test configuration files and network configuration files for caliper to use.
 4. Copy the blockchain configuration file to the `/data` directory of all remote hosts.
 5. Call caliper to test: remotely start the Docker container to build a blockchain, and locally initiate a request as a workload for testing
-[You can view the path of the deployment machine `/data` during testing, and save the **real-time data and log information** of the blockchain! 】, generate a report after completion, and finally stop the blockchain remotely.
+[You can view the path of the deployment machine `/data` during testing, and save the **real-time data and log information** of the blockchain! ], generate a report after completion, and finally stop the blockchain remotely.
 6. Organize reports and generate test results.
 
 > Not familiar with FISCO BCOS deployment and testing? Take a look at [Related Information](#related-information) or [FISCO BCOS Official Document](https://fisco-bcos-documentation.readthedocs.io/zh_CN/v2.6.0/)
